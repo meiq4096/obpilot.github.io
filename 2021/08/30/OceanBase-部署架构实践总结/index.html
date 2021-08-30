@@ -22,12 +22,12 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"obpilot.github.io","root":"/","images":"/images","scheme":"Pisces","version":"8.7.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"}}</script><script src="/js/config.js"></script>
-<meta name="description" content="本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。 标准部署形态首先来一个 OB 最基础的最中规中矩的部署架构图。 &lt;– more –&gt;  这个图信息量很大，下面一一说明。 部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环">
+<meta name="description" content="本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。 标准部署形态首先来一个 OB 最基础的最中规中矩的部署架构图。">
 <meta property="og:type" content="article">
 <meta property="og:title" content="OceanBase 部署架构实践总结">
 <meta property="og:url" content="http://obpilot.github.io/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/index.html">
 <meta property="og:site_name" content="Hexo">
-<meta property="og:description" content="本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。 标准部署形态首先来一个 OB 最基础的最中规中矩的部署架构图。 &lt;– more –&gt;  这个图信息量很大，下面一一说明。 部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环">
+<meta property="og:description" content="本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。 标准部署形态首先来一个 OB 最基础的最中规中矩的部署架构图。">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="http://obpilot.github.io/images/16275469181084.jpg">
 <meta property="og:image" content="http://obpilot.github.io/images/16275509356582.jpg">
@@ -50,7 +50,7 @@
 <meta property="og:image" content="http://obpilot.github.io/images/16276310905281.jpg">
 <meta property="og:image" content="http://obpilot.github.io/images/16276563498506.jpg">
 <meta property="article:published_time" content="2021-08-30T10:29:38.000Z">
-<meta property="article:modified_time" content="2021-08-30T12:36:37.489Z">
+<meta property="article:modified_time" content="2021-08-30T12:37:30.609Z">
 <meta property="article:author" content="obpilot">
 <meta property="article:tag" content="OCEANBASE">
 <meta property="article:tag" content="运维">
@@ -254,7 +254,7 @@
       <span class="post-meta-item-text">Posted on</span>
       
 
-      <time title="Created: 2021-08-30 18:29:38 / Modified: 20:36:37" itemprop="dateCreated datePublished" datetime="2021-08-30T18:29:38+08:00">2021-08-30</time>
+      <time title="Created: 2021-08-30 18:29:38 / Modified: 20:37:30" itemprop="dateCreated datePublished" datetime="2021-08-30T18:29:38+08:00">2021-08-30</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -300,7 +300,8 @@
     <div class="post-body" itemprop="articleBody">
         <p>本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。</p>
 <h2 id="标准部署形态"><a href="#标准部署形态" class="headerlink" title="标准部署形态"></a>标准部署形态</h2><p>首先来一个 OB 最基础的最中规中矩的部署架构图。</p>
-<p>&lt;– more –&gt;</p>
+<span id="more"></span>
+
 <p><img src="/images/16275469181084.jpg"></p>
 <p>这个图信息量很大，下面一一说明。</p>
 <p>部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环境标准化。</p>
@@ -308,7 +309,7 @@
 <p>OAT 怎么部署？<br>OAT 为了适应各种客户环境，选择了 docker 技术，只要启动一个 docker 容器就可以用。</p>
 <p>初始化机器环境只是 OAT 基本功能，还可以自动化部署 OCP、OMS、ODC 等产品。这些产品都提供 docker 镜像，都以容器形式运行。就不怕用户环境的千差万别了。</p>
 <p>早期没有 OAT，则在命令行下用 OB 提供的软件自动化部署 OCP 容器。</p>
-<span id="more"></span>
+<!-- more -->
 
 <h3 id="关于-OCP"><a href="#关于-OCP" class="headerlink" title="关于 OCP"></a>关于 OCP</h3><ul>
 <li>OCP 以集群形式运行，有高可用和负载均衡能力。所以生产环境建议 OCP 有3台服务器。机器预算有限的客户，可以选择用1台服务器部署 OCP。缺点就是没有高可用。</li>
@@ -556,7 +557,7 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="Reading time total">1:09</span>
+    <span title="Reading time total">1:08</span>
   </span>
 </div>
 <div class="busuanzi-count">
