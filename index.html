@@ -139,7 +139,7 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-count">5</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
@@ -150,7 +150,7 @@
       </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-count">8</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
@@ -193,6 +193,110 @@
 
 
     <div class="main-inner index posts-expand">
+
+    
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+    <link itemprop="mainEntityOfPage" href="http://obpilot.github.io/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="obpilot">
+      <meta itemprop="description" content="obpilot home">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="Hexo">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          <a href="/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/" class="post-title-link" itemprop="url">OceanBase 部署架构实践总结</a>
+        </h2>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">Posted on</span>
+      
+
+      <time title="Created: 2021-08-30 18:29:38 / Modified: 18:38:31" itemprop="dateCreated datePublished" datetime="2021-08-30T18:29:38+08:00">2021-08-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">In</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E8%BF%90%E7%BB%B4/" itemprop="url" rel="index"><span itemprop="name">运维</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="Symbols count in article">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">Symbols count in article: </span>
+      <span>7.4k</span>
+    </span>
+    <span class="post-meta-item" title="Reading time">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">Reading time &asymp;</span>
+      <span>7 mins.</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+          <p>本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。</p>
+<h2 id="标准部署形态"><a href="#标准部署形态" class="headerlink" title="标准部署形态"></a>标准部署形态</h2><p>首先来一个 OB 最基础的最中规中矩的部署架构图。</p>
+<p><img src="/images/16275469181084.jpg"></p>
+<p>&lt;– more –&gt;<br>这个图信息量很大，下面一一说明。</p>
+<p>部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环境标准化。</p>
+<h3 id="部署环境标准化"><a href="#部署环境标准化" class="headerlink" title="部署环境标准化"></a>部署环境标准化</h3><p>不同客户的机器配置也不尽相同，OB 会对软硬件提一些基本要求。然后提供一个工具对机器进行自动初始化。主要是 OS 内核和会话参数的设置、文件系统的划分、用户和相关目录的创建。<br>早期的时候需要命令行下每个机器挨个执行。<br>现在提供了一个 OAT 产品（有图形界面），挨个添加机器，点点鼠标，自动初始化环境。现在一次初始化十几台机器也不是问题。</p>
+<p>OAT 怎么部署？<br>OAT 为了适应各种客户环境，选择了 docker 技术，只要启动一个 docker 容器就可以用。</p>
+<p>初始化机器环境只是 OAT 基本功能，还可以自动化部署 OCP、OMS、ODC 等产品。这些产品都提供 docker 镜像，都以容器形式运行。就不怕用户环境的千差万别了。</p>
+<p>早期没有 OAT，则在命令行下用 OB 提供的软件自动化部署 OCP 容器。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/#more" rel="contents">
+                Read more &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
+      
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+        <div class="post-eof"></div>
+      
+    </footer>
+  </article>
+</div>
+
+
+
 
     
 
@@ -526,7 +630,7 @@
       <span class="post-meta-item-text">Posted on</span>
       
 
-      <time title="Created: 2021-08-30 09:57:00 / Modified: 09:59:57" itemprop="dateCreated datePublished" datetime="2021-08-30T09:57:00+08:00">2021-08-30</time>
+      <time title="Created: 2021-08-30 09:57:00 / Modified: 18:13:55" itemprop="dateCreated datePublished" datetime="2021-08-30T09:57:00+08:00">2021-08-30</time>
     </span>
 
   
@@ -606,13 +710,13 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-line"></i>
     </span>
-    <span title="Symbols count total">68k</span>
+    <span title="Symbols count total">75k</span>
   </span>
   <span class="post-meta-item">
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="Reading time total">1:02</span>
+    <span title="Reading time total">1:08</span>
   </span>
 </div>
 <div class="busuanzi-count">

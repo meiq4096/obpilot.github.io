@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
+    <loc>http://obpilot.github.io/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/</loc>
+    <lastmod>2021-08-30</lastmod>
+  </url>
+  <url>
+    <loc>http://obpilot.github.io/2021/08/30/hello-world/</loc>
+    <lastmod>2021-08-30</lastmod>
+  </url>
+  <url>
     <loc>http://obpilot.github.io/2021/08/30/%E5%A6%82%E4%BD%95%E4%BD%BF%E7%94%A8DataX%E5%9C%A8OB%E5%92%8C%E4%BC%A0%E7%BB%9F%E6%95%B0%E6%8D%AE%E5%BA%93%E4%B9%8B%E9%97%B4%E5%90%8C%E6%AD%A5%E6%95%B0%E6%8D%AE/</loc>
     <lastmod>2021-08-30</lastmod>
   </url>
@@ -10,10 +18,6 @@
   </url>
   <url>
     <loc>http://obpilot.github.io/2021/08/30/DB2-%E8%BF%81%E7%A7%BB-OceanBase-%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/</loc>
-    <lastmod>2021-08-30</lastmod>
-  </url>
-  <url>
-    <loc>http://obpilot.github.io/2021/08/30/hello-world/</loc>
     <lastmod>2021-08-30</lastmod>
   </url>
 </urlset> 
