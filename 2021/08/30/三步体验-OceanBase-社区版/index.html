@@ -32,7 +32,7 @@
 <meta property="og:image" content="http://obpilot.github.io/images/16301420583501.jpg">
 <meta property="og:image" content="http://obpilot.github.io/images/16296964112262.jpg">
 <meta property="article:published_time" content="2021-08-30T02:43:19.000Z">
-<meta property="article:modified_time" content="2021-08-30T08:34:04.895Z">
+<meta property="article:modified_time" content="2021-08-30T09:58:07.433Z">
 <meta property="article:author" content="obpilot">
 <meta property="article:tag" content="OCEANBASE">
 <meta property="article:tag" content="OCEANBASE-CE">
@@ -236,7 +236,7 @@
       <span class="post-meta-item-text">Posted on</span>
       
 
-      <time title="Created: 2021-08-30 10:43:19 / Modified: 16:34:04" itemprop="dateCreated datePublished" datetime="2021-08-30T10:43:19+08:00">2021-08-30</time>
+      <time title="Created: 2021-08-30 10:43:19 / Modified: 17:58:07" itemprop="dateCreated datePublished" datetime="2021-08-30T10:43:19+08:00">2021-08-30</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -288,11 +288,16 @@
 <li>空间不少于10G</li>
 </ul>
 <h2 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h2><p>笔记本需要安装 Docker，并且在 Docker 的设置里将容器使用的内存上限调整到 10 G 。下面是 Mac 版本的 Docker 容器设置。</p>
+<span id="more"></span>
+
+
 <p><img src="/images/16301420583501.jpg"></p>
 <h3 id="下载镜像和启动容器"><a href="#下载镜像和启动容器" class="headerlink" title="下载镜像和启动容器"></a>下载镜像和启动容器</h3><p>下载镜像，文件大概 2.3G 不到。具体时间取决于连接 <code>https://hub.docker.com/repository/docker/obpilot/oceanbase-ce</code> 网站的网速。</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">docker pull obpilot/oceanbase-ce:latest</span><br><span class="line"></span><br><span class="line">docker images</span><br><span class="line">REPOSITORY                                            TAG                     IMAGE ID            CREATED             SIZE</span><br><span class="line">obpilot/oceanbase-ce                                  latest                  0017baaa9d87        23 minutes ago      2.24GB</span><br><span class="line"></span><br><span class="line">docker run -itd -m 10G --name oceanbase-ce  obpilot/oceanbase-ce:latest</span><br><span class="line"></span><br><span class="line">docker ps</span><br><span class="line">CONTAINER ID        IMAGE                         COMMAND                  CREATED             STATUS              PORTS                                                                     NAMES</span><br><span class="line">e5dd6da0aa8d        obpilot/oceanbase-ce:latest   <span class="string">&quot;/bin/bash&quot;</span>              40 minutes ago      Up 40 minutes                                                                                 oceanbase-ce</span><br></pre></td></tr></table></figure>
 
 <p>启动容器的时候，可选的是如果有独立盘目录 <code>/data</code>，可以加上 <code>-v /data:/data </code> 参数。</p>
+<!-- more -->
+
 <h3 id="登录容器，启动-OB-集群"><a href="#登录容器，启动-OB-集群" class="headerlink" title="登录容器，启动 OB 集群"></a>登录容器，启动 OB 集群</h3><p>容器内已经部署了 OB 社区版自动化部署工具 OBD 。使用 OBD 启动集群，第一次会初始化集群，时间需要2-3分钟（取决于宿主机性能）。</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">docker <span class="built_in">exec</span> -it oceanbase-ce bash</span><br><span class="line"></span><br><span class="line">obd cluster list</span><br><span class="line"></span><br><span class="line">obd cluster start obdemo</span><br><span class="line"></span><br></pre></td></tr></table></figure>
 
