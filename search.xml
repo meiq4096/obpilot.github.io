@@ -1,6 +1,277 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>OceanBase 部署架构实践总结</title>
+    <url>/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/</url>
+    <content><![CDATA[<p>本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。</p>
+<h2 id="标准部署形态"><a href="#标准部署形态" class="headerlink" title="标准部署形态"></a>标准部署形态</h2><p>首先来一个 OB 最基础的最中规中矩的部署架构图。</p>
+<p><img src="/images/16275469181084.jpg"></p>
+<p>&lt;– more –&gt;</p>
+<p>这个图信息量很大，下面一一说明。</p>
+<p>部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环境标准化。</p>
+<h3 id="部署环境标准化"><a href="#部署环境标准化" class="headerlink" title="部署环境标准化"></a>部署环境标准化</h3><p>不同客户的机器配置也不尽相同，OB 会对软硬件提一些基本要求。然后提供一个工具对机器进行自动初始化。主要是 OS 内核和会话参数的设置、文件系统的划分、用户和相关目录的创建。<br>早期的时候需要命令行下每个机器挨个执行。<br>现在提供了一个 OAT 产品（有图形界面），挨个添加机器，点点鼠标，自动初始化环境。现在一次初始化十几台机器也不是问题。</p>
+<p>OAT 怎么部署？<br>OAT 为了适应各种客户环境，选择了 docker 技术，只要启动一个 docker 容器就可以用。</p>
+<p>初始化机器环境只是 OAT 基本功能，还可以自动化部署 OCP、OMS、ODC 等产品。这些产品都提供 docker 镜像，都以容器形式运行。就不怕用户环境的千差万别了。</p>
+<p>早期没有 OAT，则在命令行下用 OB 提供的软件自动化部署 OCP 容器。</p>
+<span id="more"></span>
+
+<h3 id="关于-OCP"><a href="#关于-OCP" class="headerlink" title="关于 OCP"></a>关于 OCP</h3><ul>
+<li>OCP 以集群形式运行，有高可用和负载均衡能力。所以生产环境建议 OCP 有3台服务器。机器预算有限的客户，可以选择用1台服务器部署 OCP。缺点就是没有高可用。</li>
+<li>每个 OCP 服务器会有三个 docker 容器，分别对应：OCP 应用、OBPROXY 容器和 OB 元数据库容器。这个 OBPROXY 是给 OCP 自己用的，OB 元数据库容器是给 OCP 用的，不给业务用。不过有时候也给 OMS 和 ODC 存放元数据用。</li>
+<li>元数据库是 OB，所以高可用需要 3 台服务器。</li>
+<li>OCP 访问 元数据库 OB 是通过 OBPROXY 容器。当有三台的时候，需要对多个 OBPROXY 提供一个 VIP 或者域名 进行负载均衡和高可用。同理，多个 OCP 容器也许要这么一个 VIP 或者 域名。</li>
+<li>OCP 集群可以部署在一个机房，也可以部署在三个机房，哪怕其中一个机房是异地的也行。</li>
+<li>OCP 集群还可以有备集群，主要用在双机房部署需求里，以及两地三中心里异地机房单独部署用。</li>
+</ul>
+<h3 id="关于-OB"><a href="#关于-OB" class="headerlink" title="关于 OB"></a>关于 OB</h3><ul>
+<li>OB 是一个单进程的软件，进程名：<code>observer</code> 。生产环境每个 OB 机器数就一个进程。所以说 OB 集群机器的角色地位都是平等的。</li>
+<li>OB 每个进程监听2个端口：默认是 2881 和 2882 ，可以指定。开发测试学习 OB 如果只有一台服务器，可以在单机上启动多个 OB 进程（监听不同端口）来搭建一个 OB 集群。</li>
+<li>生产环境 OB 都是3台机器起步，推荐三副本（数据有三份）。也有的会选择五副本。副本数越多，抵抗故障风险的能力越强。</li>
+</ul>
+<p>大部分客户案例里，OB 集群的机器数是 3 或 5 的倍数。有的人会觉得客户比较浪费机器。这个却未必，因为 OB 还有多租户和多活的能力。</p>
+<h3 id="多租户"><a href="#多租户" class="headerlink" title="多租户"></a>多租户</h3><p>OB 以集群形态部署，提供多租户（多实例）能力给不同业务用。</p>
+<p>首先看看 OB的多实例示意图。</p>
+<p><img src="/images/16275509356582.jpg"></p>
+<ul>
+<li>重申：每个节点只有一个 OB 进程。OB 的实例不是独立的进程，是 OB 进程内部的线程集。</li>
+<li>多实例指的是：实例1、实例2和实例3。对于每个实例，在三台机器上都有数据，属于一个实例，不是三个实例。所以业务只有一个连接字符串。为了便于理解，示意图看起来像是三个实例，实际同名的就表示一个实例。物理形态是三个 OB 进程内部的线程集。</li>
+<li>每个实例的三份数据可以简单理解为一个主两个备。主会向备同步数据。默认只有实例的主被访问到（提供读写服务）。</li>
+</ul>
+<p>如果是上面这个部署图，那是给人感觉有点浪费机器。但是 OB 很灵活，它还可以是下面这种部署形态。</p>
+<p><img src="/images/16275511037010.jpg"></p>
+<ul>
+<li>OB 可以在线调整实例的主在哪个区域（ZONE）的机器上。这个就对应了传统的主备切换了。OB 里是在线做，不停机，业务影响很小，甚至不感知。</li>
+<li>当所有机器上都有实例的主的时候，这台机器就不空闲了，也就不浪费了。</li>
+</ul>
+<p>如果只是上面这种还好理解。实际上 OB 的灵活性远不止这些。还可以下面这种部署形态。</p>
+<p><img src="/images/16275514123097.jpg"></p>
+<p>每个实例 1 的三份数据都是主，彼此双向同步。有人说，这怎么可能？<br>OB 确实可以这样，这里的奥秘就在于 OB 里主备的粒度很细，可以到表级别（实际更细到表的分区）。</p>
+<p><img src="/images/16275518612311.jpg"></p>
+<ul>
+<li>分区表是多分区，如表 T1 ，有 2 个分区：分区 1 和分区 2 。</li>
+<li>普通的表是单分区，只有一个分区。如 T2 。</li>
+<li>每个分区在实例里（或者在集群里）都有三份数据，这个就是三副本。角色：1 个主副本 2个 备副本。</li>
+<li>默认情况下只有主副本提供读写服务，备副本不提供服务。特殊情况下有需要的话，备副本也可以提供只读服务，主要是读写分离考虑。</li>
+</ul>
+<p><strong>当机器上有主副本的时候，就可以认为实例在这台机器上也提供服务了。自然，这个机器也不会空闲。</strong> 这就是 OB 的多活能力。</p>
+<p>OB 的多租户使得机器资源使用粒度更精细，OB 的多活能力使得机器利用率更高，所以当业务体量有一定规模时，OB 可以用更少的机器满足业务需求。</p>
+<p>所以，你还认为 OB 浪费机器吗？</p>
+<p>如果你还是这么认为，那 OB 还有更超出你想象的部署形态。<br>在那之前，先看看 OB 扩展后的形态。</p>
+<h2 id="扩容后的-OB-部署形态"><a href="#扩容后的-OB-部署形态" class="headerlink" title="扩容后的 OB 部署形态"></a>扩容后的 OB 部署形态</h2><p>假设现在 OB 集群 从 1-1-1 扩容到 2-2-2 。可以变成下面这个形态。</p>
+<p><img src="/images/16276125524371.jpg"></p>
+<p>或者是下面这个形态</p>
+<p><img src="/images/16276124932514.jpg"></p>
+<p>或者是下面这个形态</p>
+<p><img src="/images/16276125155522.jpg"></p>
+<p>纵向看，每2台机器是一个 Zone。OB 实例可以控制主副本在哪个 ZONE 或者在哪几个 ZONE。所有实例的主副本都在一个 Zone，就是单机房提供服务，其他两个机房都是备机房。所有实例的主副本都在两个 Zone，那就是双活模式。所有实例的主副本分散在所有 Zone，那就是多活模式。</p>
+<p>上面图更突出 OB 灵活性的是 实例 1 和 实例 2 都只用了 3台机器的资源，实例 3 用了6台机器的资源。实例 3依然是3副本，只不过每份数据分布在2台服务器上。<br>这些可以在线变换，这就是 OB 集群和租户的在线弹性伸缩能力。用户只需要改变策略，数据迁移是 OB 内部事情。</p>
+<h2 id="资源异构的部署形态"><a href="#资源异构的部署形态" class="headerlink" title="资源异构的部署形态"></a>资源异构的部署形态</h2><p>标准部署形态中，OB 集群三台机器资源都是对等的，每个 Zone 机器数量一样。每个实例在三个 Zone 里的资源大小也基本保持一致。这是最佳实践建议。但是技术上，为了满足一些客户项目机器预算有限，OB 是可以接受三个Zone 资源异构。</p>
+<p>OB 的分区副本有多种类型：</p>
+<ul>
+<li>全功能副本（FULL）：包含数据和事务日志，参与高可用投票（选举），可以候选为主副本。</li>
+<li>数据副本（DATA）：只包含数据，不存储事务日志，不参与高可用投票（选举）。仅用于测试验证，生产环境没有用过。</li>
+<li>日志副本（LOGONLY)：只包含事务日志，参与高可用投票（选举），但是不会当选为主副本（因为没有数据）。日志副本不能转换为其他副本类型。</li>
+<li>只读副本（READONLY)：包含数据和事务日志，不参与高可用投票（选举），不可以候选为主副本。只能读不能写，用于读写分离场景。可以在线来回转换为全功能副本。</li>
+</ul>
+<p><img src="/images/16276126484769.jpg"></p>
+<h3 id="日志副本"><a href="#日志副本" class="headerlink" title="日志副本"></a>日志副本</h3><p>日志副本不包含数据，使得可以节省磁盘空间。CPU和内存方面也可以适当减少（内存不能太小，不要低于8G）。<strong>日志副本的内存大小会限制整个实例能创建的分区数量，所以不要太小。</strong>日志副本的特性，使得下面这种部署形态也是可以的。图中矩形框的大小可以理解为资源的大小（资源就是CPU、内存和空间）。</p>
+<p><img src="/images/16276145261791.jpg"></p>
+<p>架构说明：</p>
+<ul>
+<li>ZONE1 和 ZONE2 中实例的数据副本都是全功能副本，ZONE3 中实例的数据副本都是日志副本。</li>
+<li>日志副本的资源可以少一些。最少不要低于2C8G（尤其是内存8G）。内存大小还要考虑实例里的分区数目。</li>
+<li>这里使用日志副本，通过适当的排列，可以实现每个实例提供服务的副本可以使用更多的机器资源。</li>
+</ul>
+<p>上面这种用法只是进一步提升了机器资源利用率，并没有明显减少机器，下面这种玩法就更高级了。<br><img src="/images/16276446515060.jpg"></p>
+<p>架构说明：</p>
+<ul>
+<li>ZONE1 和 ZONE2 分别是 2 台服务器，ZONE3 分别是 1 台服务器。集群的架构简称为 2-2-1 。</li>
+<li>ZONE1 和 ZONE2 中实例的数据副本都是全功能副本，ZONE3 中实例的数据副本都是日志副本。</li>
+<li>实际运用的时候也可以 3-3-1 。但是要看看这个 1 的机器资源大小。尤其是 内存大小。当租户很多的时候，每个日志副本内存至少8G，ZONE3 的1台机器承载的实例数量也是有限的。所以 4-4-1 可能很危险，但可以 4-4-2 。资源是关键。</li>
+</ul>
+<p>比如说下面这个就是一个业务场景的资源布局图。<br><img src="/images/16276373898734.jpg"></p>
+<p>架构说明：</p>
+<ul>
+<li>集群机器 5 台，其中 2 台机器的 CPU 要少一些。集群架构 2-2-1 ， Zone1 使用了日志副本。</li>
+<li>不同实例都设置一个 PRIMARY_ZONE ，控制主副本的位置，以及备用备副本的位置。</li>
+<li>资源大小：主副本 &gt; 备副本 &gt;&gt; 日志副本。 不同租户的主副本、备副本和日志副本交叉部署，让提供服务的主副本资源能力最大化。</li>
+<li>实例的资源大小、实例的副本分布位置（机器），都是可以在OCP 中在线调整，操作非常方便。涉及到的数据迁移是 OB 内部事情，不需要 DBA 手动操作。并且迁移期间，业务读写不停。也不怕机器故障（有高可用）。</li>
+</ul>
+<h3 id="只读副本"><a href="#只读副本" class="headerlink" title="只读副本"></a>只读副本</h3><p>默认情况下 OB 的三副本只有主副本提供读写服务，备副本不提供服务。但是通过 OBPROXY的会话设置或者 SQL语句设置，业务也可以读备副本。这就是读写分离。<br>不过由于 OB 特殊的多实例能力，以及多活，这种读备副本的读写分离意义不是特别大。如果是大量的读写分离需求，建议部署只读副本。</p>
+<p><img src="/images/16277023370498.jpg"></p>
+<p>架构说明：</p>
+<ul>
+<li>ZONE4 的机器里部署的是只读副本，机器数可以跟其他 ZONE 不同，可以在线调整。</li>
+<li>只读副本的建立是按实例配置的，实例只读副本的资源也是可以独立设置的（根据需要在线调整）。每个实例可以配置 1 个或多个 只读副本（2个只读副本就要2台机器）。这个主要看都承担的压力。</li>
+<li>只读副本只承担读服务，不能接受写请求。实际上写请求不会路由到只读副本上。关于路由以后再单独介绍。</li>
+</ul>
+<p>只读副本的数据是从主副本同步过来的，理论上会有延时，但是数据绝对不会错。只读副本自身故障后恢复时，数据同步可以自动恢复，不需要 DBA 介入处理数据同步。只读副本也可以在线重建。所以说 OB 的运维是非常方便的，只有体验过一次的人才能理解。</p>
+<p>除了资源异构，OB 还有很多种混和部署方案。</p>
+<h2 id="混合部署方案"><a href="#混合部署方案" class="headerlink" title="混合部署方案"></a>混合部署方案</h2><h3 id="国产化方案"><a href="#国产化方案" class="headerlink" title="国产化方案"></a>国产化方案</h3><p>OB 集群支持国产化产品：</p>
+<ul>
+<li>服务器：华为泰山</li>
+<li>CPU： 鲲鹏 920、海光 XC的CPU （5280 和 7280）、飞腾2000 。</li>
+<li>OS ：麒麟系统（中标V7/银河V10，后合并了)、统信 UOS 。</li>
+</ul>
+<p>OB 集群可以全部部署在国产化服务器上并使用国产操作系统。外部有代表性的客户案例有宇宙行的对公理财业务。</p>
+<p>当然有些客户可能对国产服务器和软件还有些担心。OB 也支持下面这些混搭方案。</p>
+<ul>
+<li>主集群是 x86_64 + redhat/centos , 备集群是 aarch_64 + 麒麟 OS 。代表案例是某头部寿险业务。</li>
+<li>主集群的多数派 Zone 是 x86_64 + redhat/centos，少数派 Zone 是 aarch_64 + 麒麟 OS 。并且可以逐步用国产服务器替换商用服务器。代表案例是支付宝某核心业务（集群规模大，早期基于性能考虑没有全部替换）。</li>
+</ul>
+<h3 id="混合云部署方案"><a href="#混合云部署方案" class="headerlink" title="混合云部署方案"></a>混合云部署方案</h3><p>主要适合有专有云和自有机房的客户。可以在专有云和自由机房之间部署一个 OB 集群，或者 OB 主备集群。 OB 本质是一个软件，可以部署在物理机、ECS上，只要网络通并且延时和带宽满足要求即可。<br>使用主备集群方案时，可以将备集群放到云上 或者 线下，实现云上和云下的容灾。</p>
+<h3 id="多云部署方案"><a href="#多云部署方案" class="headerlink" title="多云部署方案"></a>多云部署方案</h3><p>主要适合在多个云厂商有 ECS 并自建数据库的客户。只要打通两边云厂商的 VPC 网络，横跨两个云厂商的ECS部署一个 OB 集群。建议5副本，实现跨云的多活能力。</p>
+<h2 id="OB-的容灾多活部署方案"><a href="#OB-的容灾多活部署方案" class="headerlink" title="OB 的容灾多活部署方案"></a>OB 的容灾多活部署方案</h2><p>OB 产品的特别之处就在于 OB 集群可以跨机房部署，甚至可以跨城市部署。根据实际需求不同也有多种玩法。</p>
+<h3 id="两地三中心三副本"><a href="#两地三中心三副本" class="headerlink" title="两地三中心三副本"></a>两地三中心三副本</h3><p><img src="/images/16276155163743.jpg"></p>
+<p>架构说明：</p>
+<ul>
+<li>同城双机房的机器都提供服务，双机房的之间的延时决定了实例的事务提交性能。</li>
+<li>当两个城市不是那么远的时候（杭州和上海网络延时 5~ 7ms左右），对于普通的业务，使用三副本就够了。即使有机器故障，业务实例的延时增加也在业务容忍范围内就行。</li>
+<li>如果两个城市的延时水平不满足业务性能要求，那就将副本数增加到5副本。副本越多，抵抗风险能力越强。</li>
+</ul>
+<h3 id="两地三中心五副本"><a href="#两地三中心五副本" class="headerlink" title="两地三中心五副本"></a>两地三中心五副本</h3><p><img src="/images/16276376363680.jpg"></p>
+<p>架构说明：</p>
+<ul>
+<li>总体三个机房：上海两个机房，北京一个机房。 这是某国有大行的理财业务（OB）的机房和OB部署示意图。</li>
+<li>上海每个机房里准备两个ZONE，上海两个机房之间是光纤专线，带宽和延时不是问题。双机房的4个ZONE 同时提供服务，这个能力空间很大。</li>
+<li>北京机房会有一个 ZONE5，跟上海两机房的四个 ZONE 合起来就是 OB 主集群。上海和北京机房的延时和带宽需要评估，不用像同城双机房之间那么高，但也不能太低。</li>
+<li>OB 主集群对每个具体的数据分区，可以抵抗最多两台机器同时故障带来的风险。如果有三台机器故障，局部实例不可用。这个时候就考虑切换到北京机房的 OB 备集群。</li>
+<li>OB 备集群是近期 OB 新增的能力，跟 ZONE5 部署一同部署在北京机房。OB 备集群可以是单副本，也可以是三副本，看灾备要求定。也可以先是单副本，后期启用后，在线扩容到三副本（只要机器准备好即可）。OB 集群的每个 ZONE 内机器数量可以跟主集群的ZONE 内机器数量不一致，但是相差不要太大。OB 主备集群同步能力见下面双机房主板容灾方案说明。再次说明，OB 的部署很灵活。</li>
+<li>水平拆分方案选择用了 OB 的分区表技术。同一个表的不同分区打散到多个机房多台机器。</li>
+<li>这个架构图满足工行数据库容灾等级最高要求。</li>
+</ul>
+<h3 id="双机房主备容灾方案"><a href="#双机房主备容灾方案" class="headerlink" title="双机房主备容灾方案"></a>双机房主备容灾方案</h3><p>凡事使用 Paxos 或者 Raft 技术的产品，都要求副本数是奇数（偶数副本数没有意义），在机房容灾部署的时候都会要求有三个可用区。但是传统客户，尤其是金融客户，都是同城两机房，异地可能还有个机房，只是那个机房很可能延时大带宽太小，规格不够。实际能用的就是同城双机房。</p>
+<p>目前 OB对双机房的部署方案就回归到传统 ORACLE 的 Dataguard 方案。</p>
+<p><img src="/images/16276236183782.jpg"></p>
+<p>架构说明：</p>
+<ul>
+<li>双机房，主机房部署 OB 主集群，备机房部署 OB 备集群。备集群可以是单副本，也可以是三副本，取决于容灾要求。</li>
+<li>OB 主备集群是两个集群，同步类似 ORACLE 的Dataguard 方案同步，通常是最大性能同步，也支持最大保护（强同步）和最大可用（在最大保护和最大性能之间取平衡）。按 ORACLE 的项目经验，绝大部分客户都用最大性能。推测 OB 的客户也多是如此。</li>
+<li>目前 OB 主备集群同步是整个集群里所有实例都同步。未来可能会变化按实例配置同步。</li>
+<li>OB 主备集群的切换支持正常的切换（<code>switchover</code>）和故障切换（<code>failover</code>）。在最大性能同步的时候，故障切换是不能保证不丢数据（<code>RPO&gt;=0</code>)。这个跟传统ORACLE DG的能力是一致。</li>
+</ul>
+<p>OB 主备集群双机房方案跟传统主备方案的能力和特点一样。缺点也是一样的，就是备集群默认不提供服务，备机房也没有利用上，有点浪费。不过 OB 的备集群也是可以提供只读服务，这也是 OB 读写分离的一种使用方法，分离的更彻底。</p>
+<p>如果想利用备机房，OB 的部署架构图还可以调整为下面这种：</p>
+<p><img src="/images/16276236270582.jpg"></p>
+<p>架构说明：</p>
+<ul>
+<li>双机房，OB 主集群的部分 Zone （少数派，3副本中的1个副本，5副本中的2个副本）放在机房 2。OB 的多活能力是 OB 所有的机器都有同时写入能力。</li>
+<li>不过，实例事务提交性能取决于多数派副本的事务日志同步能力和日志写能力。机房 2 的性能会比机房 1 的性能会慢一些（具体慢多少取决于双机房之间的网络延时和带宽）。此外，可能还会有分布式事务。</li>
+<li>有些业务是能接受这种性能，那么就可以将主副本打散到双机房。上图是 实例 1 和实例 2 在机房 1 和 2 同时提供读写服务。实例3 不接受这种性能损失，那就不在备机房提供读写服务。</li>
+<li>这个方案的特点是实现了双活，同时也解决了 OB主集群多数派故障时的可用性问题（故障切换到备集群）。备集群图中是单副本，启用后需要更高可用性的话，也可以在线扩容到三副本（前提是有机器）。</li>
+</ul>
+<h3 id="单元化部署方案"><a href="#单元化部署方案" class="headerlink" title="单元化部署方案"></a>单元化部署方案</h3><p>单元化是多活能力的最高标准，指的是从业务到数据库的链路都发生在某个机房。<br>要实现单元化，必须在应用层面对数据水平拆分，即分库分表（为什么？这个说来话长，这里不细说请看参考资料）。具体是 1 库 1 表或者 1 库多表，看业务特点。也不是所有的业务都能水平拆分。下面仅看能做水平拆分的业务数据的单元化部署架构。</p>
+<p><img src="/images/16276296569936.jpg"></p>
+<p>架构说明：</p>
+<ul>
+<li>应用在杭州和上海每个机房都部署，数据库是1套（真实业务是多套）OB集群横跨 5 个机房部署。</li>
+<li>实例 1-5 对应的是同一份业务数据，业务数据按用户ID（UID）拆分为5个实例（这里只是<strong>示意图</strong>，蚂蚁内部拆分为百库百表，远不止5个实例，比这个图粒度更细）。</li>
+<li>候选主副本指的如果某个ZONE的主副本故障了，会优先切换到同城另外一个机房的备副本上，这样业务层都可以不用切换流量。</li>
+<li>单元化架构的关键就是应用请求之间也带有UID信息，应用的流量转发也有水平拆分规则。应用流量的水平拆分规则跟数据库的水平拆分规则保持一致并联动。</li>
+<li>在单元化里，OB 的价值就是在数据库层面解决了数据多机房的强同步和高可用能力。RPO=0，RTO~30s。</li>
+</ul>
+<p><img src="/images/16276310905281.jpg"></p>
+<p>以上是蚂蚁和网商两地三中心五副本单元化的示意架构图，这套架构使用了 SOFA + OB 的多个产品。SOFA &amp; OB 最佳实践已经在多个外部客户落地。</p>
+<p>蚂蚁做单元化用了至少5个机房，外部客户不一定有这么多机房。4个机房的也可以玩。下面是某国有大行的银行核心业务之一的近似单元化架构。</p>
+<p><img src="/images/16276563498506.jpg"></p>
+<p>架构说明：</p>
+<ul>
+<li>总共有两个城市四个机房，每个城市有两个机房，机房之间光纤专线，延时和带宽都不是问题。</li>
+<li>业务数据水平拆分为南北两个集群（实例），每个集群的数据没有进一步水平拆分，而是直接用一个实例，在实例内部用 OB 的水平拆分技术（分区表技术）。同一个表的不同分区打散到多个机房多台机器。</li>
+<li>异地机房也做了一个三副本的 OB 备集群。整体容灾能力为最高水平。</li>
+<li>OB 的价值：提供跨机房跨城市的数据多副本同步技术（指高可用和强一致）；提供对业务完全透明的原生的水平拆分技术（指分区表技术，详情请看参考资料）。</li>
+</ul>
+<h2 id="后记"><a href="#后记" class="headerlink" title="后记"></a>后记</h2><p>总结一下，不管 OB 是那种部署方案，在一个集群内部，只要故障节点是少数派节点，OB都能提供极致的高可用能力（RPO=0,RTO<del>30s）。OB集群的各种部署架构和性能测试都是把数据安全放到第一位，没有异步同步或半同步等技术。针对 OB 主备集群，需要认识到主备集群同步跟传统数据库主备同步原理是一样的，不一定能保证故障切换不丢数据（RPO&gt;=0），并且故障切换也是需要手动做的（RTO</del>分钟级别）。</p>
+<p>OB 的部署方案都说到了吗？</p>
+<p>还没有，OB 3.2 版本将会推出计算存储分离架构，届时可以针对计算和存储能力分开配置服务器数目，上面部署形态又可以进一步变化。。。</p>
+]]></content>
+      <categories>
+        <category>运维</category>
+      </categories>
+      <tags>
+        <tag>OCEANBASE</tag>
+        <tag>运维</tag>
+        <tag>架构</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Hello World</title>
+    <url>/2021/08/30/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.<br>&lt;– more –&gt;</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+]]></content>
+      <tags>
+        <tag>hexo</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>三步体验 OceanBase 社区版</title>
+    <url>/2021/08/30/%E4%B8%89%E6%AD%A5%E4%BD%93%E9%AA%8C-OceanBase-%E7%A4%BE%E5%8C%BA%E7%89%88/</url>
+    <content><![CDATA[<h2 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h2><p>本文是个人基于 OceanBase 社区版构建了一个容器镜像，仅用于学习研究。只要你有一个 4C10G的笔记本可以联网，你就可以在5分钟内将 OceanBase 社区版跑起来。</p>
+<h2 id="前提条件"><a href="#前提条件" class="headerlink" title="前提条件"></a>前提条件</h2><p>请确保宿主机的可用资源满足下面要求：</p>
+<ul>
+<li>逻辑 CPU 不少于4个</li>
+<li>可用内存不少于 10G，并且 docker 容器内存限制不少于10G</li>
+<li>空间不少于10G</li>
+</ul>
+<h2 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h2><p>笔记本需要安装 Docker，并且在 Docker 的设置里将容器使用的内存上限调整到 10 G 。下面是 Mac 版本的 Docker 容器设置。</p>
+<span id="more"></span>
+
+
+<p><img src="/images/16301420583501.jpg"></p>
+<h3 id="下载镜像和启动容器"><a href="#下载镜像和启动容器" class="headerlink" title="下载镜像和启动容器"></a>下载镜像和启动容器</h3><p>下载镜像，文件大概 2.3G 不到。具体时间取决于连接 <code>https://hub.docker.com/repository/docker/obpilot/oceanbase-ce</code> 网站的网速。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker pull obpilot/oceanbase-ce:latest</span><br><span class="line"></span><br><span class="line">docker images</span><br><span class="line">REPOSITORY                                            TAG                     IMAGE ID            CREATED             SIZE</span><br><span class="line">obpilot/oceanbase-ce                                  latest                  0017baaa9d87        23 minutes ago      2.24GB</span><br><span class="line"></span><br><span class="line">docker run -itd -m 10G --name oceanbase-ce  obpilot/oceanbase-ce:latest</span><br><span class="line"></span><br><span class="line">docker ps</span><br><span class="line">CONTAINER ID        IMAGE                         COMMAND                  CREATED             STATUS              PORTS                                                                     NAMES</span><br><span class="line">e5dd6da0aa8d        obpilot/oceanbase-ce:latest   <span class="string">&quot;/bin/bash&quot;</span>              40 minutes ago      Up 40 minutes                                                                                 oceanbase-ce</span><br></pre></td></tr></table></figure>
+
+<p>启动容器的时候，可选的是如果有独立盘目录 <code>/data</code>，可以加上 <code>-v /data:/data </code> 参数。</p>
+<!-- more -->
+
+<h3 id="登录容器，启动-OB-集群"><a href="#登录容器，启动-OB-集群" class="headerlink" title="登录容器，启动 OB 集群"></a>登录容器，启动 OB 集群</h3><p>容器内已经部署了 OB 社区版自动化部署工具 OBD 。使用 OBD 启动集群，第一次会初始化集群，时间需要2-3分钟（取决于宿主机性能）。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker <span class="built_in">exec</span> -it oceanbase-ce bash</span><br><span class="line"></span><br><span class="line">obd cluster list</span><br><span class="line"></span><br><span class="line">obd cluster start obdemo</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>下面是启动输出。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">[admin@e5dd6da0aa8d ~]$ obd cluster list</span><br><span class="line">+------------------------------------------------------------+</span><br><span class="line">|                        Cluster List                        |</span><br><span class="line">+--------+---------------------------------+-----------------+</span><br><span class="line">| Name   | Configuration Path              | Status (Cached) |</span><br><span class="line">+--------+---------------------------------+-----------------+</span><br><span class="line">| obdemo | /home/admin/.obd/cluster/obdemo | deployed        |</span><br><span class="line">+--------+---------------------------------+-----------------+</span><br><span class="line">[admin@e5dd6da0aa8d ~]$ obd cluster start obdemo</span><br><span class="line">Get <span class="built_in">local</span> repositories and plugins ok</span><br><span class="line">Open ssh connection ok</span><br><span class="line">Cluster param config check ok</span><br><span class="line">Check before start observer ok</span><br><span class="line">Check before start obproxy ok</span><br><span class="line">Start observer ok</span><br><span class="line">observer program health check ok</span><br><span class="line">Connect to observer ok</span><br><span class="line">Initialize cluster</span><br><span class="line">Cluster bootstrap ok</span><br><span class="line">Wait <span class="keyword">for</span> observer init ok</span><br><span class="line">+---------------------------------------------+</span><br><span class="line">|                   observer                  |</span><br><span class="line">+-----------+---------+------+-------+--------+</span><br><span class="line">| ip        | version | port | zone  | status |</span><br><span class="line">+-----------+---------+------+-------+--------+</span><br><span class="line">| 127.0.0.1 | 3.1.0   | 2881 | zone1 | active |</span><br><span class="line">+-----------+---------+------+-------+--------+</span><br><span class="line"></span><br><span class="line">Start obproxy ok</span><br><span class="line">obproxy program health check ok</span><br><span class="line">Connect to obproxy ok</span><br><span class="line">Initialize cluster</span><br><span class="line">+---------------------------------------------+</span><br><span class="line">|                   obproxy                   |</span><br><span class="line">+-----------+------+-----------------+--------+</span><br><span class="line">| ip        | port | prometheus_port | status |</span><br><span class="line">+-----------+------+-----------------+--------+</span><br><span class="line">| 127.0.0.1 | 2883 | 2884            | active |</span><br><span class="line">+-----------+------+-----------------+--------+</span><br><span class="line">obdemo running</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>admin 用户的密码是 : <code>adminPWD123</code> . 您可以使用 sudo yum 安装软件包。</p>
+<h3 id="创建-OB-实例（租户）"><a href="#创建-OB-实例（租户）" class="headerlink" title="创建 OB 实例（租户）"></a>创建 OB 实例（租户）</h3><p>默认初始化的 OB 集群还没有创建业务实例。需要手动建一个。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">obclient -h127.1 -uroot@sys<span class="comment">#obdemo -P2883 -prootPWD123 -c -A oceanbase</span></span><br><span class="line"></span><br><span class="line">alter resource unit sys_unit_config min_cpu=5;</span><br><span class="line">-- 创建资源单元规格</span><br><span class="line">CREATE resource unit S4C1G max_cpu=4, min_cpu=4, max_memory=<span class="string">&#x27;1G&#x27;</span>, min_memory=<span class="string">&#x27;1G&#x27;</span>, max_iops=10000, min_iops=1000, max_session_num=1000000, max_disk_size=<span class="string">&#x27;1024G&#x27;</span>; </span><br><span class="line"></span><br><span class="line">-- 创建资源池（分配资源）</span><br><span class="line">CREATE resource pool my_pool unit = <span class="string">&#x27;S4C1G&#x27;</span>, unit_num = 1;</span><br><span class="line"></span><br><span class="line">-- 创建实例（mysql类型）</span><br><span class="line">create tenant obmysql resource_pool_list=(<span class="string">&#x27;my_pool&#x27;</span>), primary_zone=<span class="string">&#x27;RANDOM&#x27;</span>,comment <span class="string">&#x27;mysql tenant/instance&#x27;</span>, charset=<span class="string">&#x27;utf8&#x27;</span> <span class="built_in">set</span> ob_tcp_invited_nodes=<span class="string">&#x27;%&#x27;</span>, ob_compatibility_mode=<span class="string">&#x27;mysql&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="built_in">exit</span>;</span><br></pre></td></tr></table></figure>
+
+<h3 id="登录使用-OB-实例"><a href="#登录使用-OB-实例" class="headerlink" title="登录使用 OB 实例"></a>登录使用 OB 实例</h3><p>默认创建的 OB 实例，连接密码是空。 登录后可以导入 bmsql.sql 中的建库建表语句。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">obclient -h 127.1 -uroot@obmysql<span class="comment">#obdemo -P2883 -p -c -A test</span></span><br><span class="line"></span><br><span class="line">empty password.</span><br><span class="line"></span><br><span class="line">show databases;</span><br><span class="line"></span><br><span class="line"><span class="built_in">source</span> bmsql.sql</span><br></pre></td></tr></table></figure>
+
+<p>成功后，输出</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">MySQL [tpccdb]<span class="operator">&gt;</span> <span class="keyword">show</span> tables;</span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+</span></span><br><span class="line"><span class="operator">|</span> Tables_in_tpccdb <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+</span></span><br><span class="line"><span class="operator">|</span> bmsql_config     <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_customer   <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_district   <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_history    <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_item       <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_new_order  <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_oorder     <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_order_line <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_stock      <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_warehouse  <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+</span></span><br><span class="line"><span class="number">10</span> <span class="keyword">rows</span> <span class="keyword">in</span> <span class="keyword">set</span> (<span class="number">0.003</span> sec)</span><br><span class="line"></span><br><span class="line">MySQL [tpccdb]<span class="operator">&gt;</span> <span class="keyword">show</span> tablegroups;</span><br><span class="line"><span class="operator">+</span><span class="comment">-----------------+------------------+---------------+</span></span><br><span class="line"><span class="operator">|</span> Tablegroup_name <span class="operator">|</span> Table_name       <span class="operator">|</span> Database_name <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">-----------------+------------------+---------------+</span></span><br><span class="line"><span class="operator">|</span> oceanbase       <span class="operator">|</span> <span class="keyword">NULL</span>             <span class="operator">|</span> <span class="keyword">NULL</span>          <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_customer   <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_district   <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_history    <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_new_order  <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_oorder     <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_order_line <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_stock      <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_warehouse  <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">-----------------+------------------+---------------+</span></span><br><span class="line"><span class="number">9</span> <span class="keyword">rows</span> <span class="keyword">in</span> <span class="keyword">set</span> (<span class="number">0.008</span> sec)</span><br></pre></td></tr></table></figure>
+
+<h2 id="附录1：Docker-镜像制作方法"><a href="#附录1：Docker-镜像制作方法" class="headerlink" title="附录1：Docker 镜像制作方法"></a>附录1：Docker 镜像制作方法</h2><p>第一次使用 Dockerfile 构建镜像，还不是很娴熟，功能做的比较粗糙。下面是 Dockerfile</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">cat Dockerfile</span><br><span class="line"></span><br><span class="line">FROM centos:latest</span><br><span class="line">MAINTAINER obpilot</span><br><span class="line">COPY ./obdemo.yaml /tmp/</span><br><span class="line"></span><br><span class="line">VOLUME [<span class="string">&quot;/data&quot;</span>]</span><br><span class="line"></span><br><span class="line">RUN yum -y install tree net-tools vim sudo passwd \</span><br><span class="line">	&amp;&amp; yum -y install mariadb-connector-c \</span><br><span class="line">	&amp;&amp; yum install -y yum-utils \</span><br><span class="line">	&amp;&amp; yum-config-manager --add-repo https://mirrors.aliyun.com/oceanbase/OceanBase.repo \</span><br><span class="line">	&amp;&amp; yum install -y ob-deploy obclient \</span><br><span class="line">	&amp;&amp; useradd admin &amp;&amp; <span class="built_in">echo</span> <span class="string">&#x27;admin:adminPWD123&#x27;</span> | chpasswd \</span><br><span class="line">	&amp;&amp; sed -i <span class="string">&#x27;$a\admin    ALL=(ALL)	ALL&#x27;</span> /etc/sudoers \</span><br><span class="line">	&amp;&amp; mkdir -p /data/1 /data/log1  \</span><br><span class="line">	&amp;&amp; chown -R admin.admin /data/ /tmp/ \</span><br><span class="line">	&amp;&amp; su admin -c  <span class="string">&quot;obd cluster deploy obdemo -c /tmp/obdemo.yaml&quot;</span></span><br><span class="line"></span><br><span class="line">USER admin</span><br><span class="line">WORKDIR /home/admin</span><br><span class="line">COPY ./bmsql.sql /home/admin/</span><br><span class="line">COPY ./readme.md /home/admin/</span><br></pre></td></tr></table></figure>
+
+<h2 id="附录2-OBD-集群初始化配置文件"><a href="#附录2-OBD-集群初始化配置文件" class="headerlink" title="附录2: OBD 集群初始化配置文件"></a>附录2: OBD 集群初始化配置文件</h2><p>OBD 是 OB 社区版推出的自动化部署工具，现在功能也越来越成熟好用了。开源网站（<code>https://github.com/oceanbase/obdeploy/tree/master/example</code>）提供了几个配置模板文件。这里是修改后的配置文件。部署的是单机版 OB，监听本地 IP。</p>
+<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="comment">## Only need to configure when remote login is required</span></span><br><span class="line"><span class="comment"># user:</span></span><br><span class="line"><span class="comment">#   username: your username</span></span><br><span class="line"><span class="comment">#   password: your password if need</span></span><br><span class="line"><span class="comment">#   key_file: your ssh-key file path if need</span></span><br><span class="line"><span class="comment">#   port: your ssh port, default 22</span></span><br><span class="line"><span class="comment">#   timeout: ssh connection timeout (second), default 30</span></span><br><span class="line"><span class="attr">oceanbase-ce:</span></span><br><span class="line">  <span class="attr">servers:</span></span><br><span class="line">    <span class="comment"># Please don&#x27;t use hostname, only IP can be supported</span></span><br><span class="line">    <span class="bullet">-</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span></span><br><span class="line">  <span class="attr">global:</span></span><br><span class="line">    <span class="comment">#  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.</span></span><br><span class="line">    <span class="attr">home_path:</span> <span class="string">/home/admin/oceanbase-ce</span></span><br><span class="line">    <span class="comment"># The directory for data storage. The default value is $home_path/store.</span></span><br><span class="line">    <span class="comment"># data_dir: /data/1</span></span><br><span class="line">    <span class="comment"># The directory for clog, ilog, and slog. The default value is the same as the data_dir value.</span></span><br><span class="line">    <span class="attr">redo_dir:</span> <span class="string">/data/log1</span></span><br><span class="line">    <span class="comment"># Please set devname as the network adaptor&#x27;s name whose ip is  in the setting of severs.</span></span><br><span class="line">    <span class="comment"># if set severs as &quot;127.0.0.1&quot;, please set devname as &quot;lo&quot;</span></span><br><span class="line">    <span class="comment"># if current ip is 192.168.1.10, and the ip&#x27;s network adaptor&#x27;s name is &quot;eth0&quot;, please use &quot;eth0&quot;</span></span><br><span class="line">    <span class="attr">devname:</span> <span class="string">lo</span></span><br><span class="line">    <span class="attr">mysql_port:</span> <span class="number">2881</span> <span class="comment"># External port for OceanBase Database. The default value is 2881.</span></span><br><span class="line">    <span class="attr">rpc_port:</span> <span class="number">2882</span> <span class="comment"># Internal port for OceanBase Database. The default value is 2882.</span></span><br><span class="line">    <span class="attr">zone:</span> <span class="string">zone1</span></span><br><span class="line">    <span class="attr">cluster_id:</span> <span class="number">1</span></span><br><span class="line">    <span class="comment"># please set memory limit to a suitable value which is matching resource.</span></span><br><span class="line">    <span class="attr">memory_limit:</span> <span class="string">8G</span> <span class="comment"># The maximum running memory for an observer</span></span><br><span class="line">    <span class="attr">system_memory:</span> <span class="string">4G</span> <span class="comment"># The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.</span></span><br><span class="line">    <span class="attr">stack_size:</span> <span class="string">512K</span></span><br><span class="line">    <span class="attr">cpu_count:</span> <span class="number">16</span></span><br><span class="line">    <span class="attr">cache_wash_threshold:</span> <span class="string">1G</span></span><br><span class="line">    <span class="attr">__min_full_resource_pool_memory:</span> <span class="number">268435456</span></span><br><span class="line">    <span class="attr">workers_per_cpu_quota:</span> <span class="number">10</span></span><br><span class="line">    <span class="attr">schema_history_expire_time:</span> <span class="string">1d</span></span><br><span class="line">    <span class="comment"># The value of net_thread_count had better be same as cpu&#x27;s core number.</span></span><br><span class="line">    <span class="attr">net_thread_count:</span> <span class="number">4</span></span><br><span class="line">    <span class="attr">major_freeze_duty_time:</span> <span class="string">Disable</span></span><br><span class="line">    <span class="attr">minor_freeze_times:</span> <span class="number">10</span></span><br><span class="line">    <span class="attr">enable_separate_sys_clog:</span> <span class="number">0</span></span><br><span class="line">    <span class="attr">enable_merge_by_turn:</span> <span class="literal">FALSE</span></span><br><span class="line">    <span class="comment">#datafile_disk_percentage: 20 # The percentage of the data_dir space to the total disk space. This value takes effect only when datafile_size is 0. The default value is 90.</span></span><br><span class="line">    <span class="attr">datafile_size:</span> <span class="string">5G</span></span><br><span class="line">    <span class="attr">syslog_level:</span> <span class="string">ERROR</span> <span class="comment"># System log level. The default value is INFO.</span></span><br><span class="line">    <span class="attr">enable_syslog_wf:</span> <span class="literal">false</span> <span class="comment"># Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.</span></span><br><span class="line">    <span class="attr">enable_syslog_recycle:</span> <span class="literal">true</span> <span class="comment"># Enable auto system log recycling or not. The default value is false.</span></span><br><span class="line">    <span class="attr">max_syslog_file_count:</span> <span class="number">4</span> <span class="comment"># The maximum number of reserved log files before enabling auto recycling. The default value is 0.</span></span><br><span class="line">    <span class="comment"># observer cluster name, consistent with obproxy&#x27;s cluster_name</span></span><br><span class="line">    <span class="attr">appname:</span> <span class="string">obdemo</span></span><br><span class="line">    <span class="attr">root_password:</span> <span class="string">rootPWD123</span> <span class="comment"># root user password, can be empty</span></span><br><span class="line">    <span class="attr">proxyro_password:</span>  <span class="string">proxyROPWD123</span> <span class="comment"># proxyro user pasword, consistent with obproxy&#x27;s observer_sys_password, can be empty</span></span><br><span class="line"><span class="attr">obproxy:</span></span><br><span class="line">  <span class="attr">servers:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span></span><br><span class="line">  <span class="attr">global:</span></span><br><span class="line">    <span class="attr">listen_port:</span> <span class="number">2883</span> <span class="comment"># External port. The default value is 2883.</span></span><br><span class="line">    <span class="attr">prometheus_listen_port:</span> <span class="number">2884</span> <span class="comment"># The Prometheus port. The default value is 2884.</span></span><br><span class="line">    <span class="attr">home_path:</span> <span class="string">/home/admin/obproxy</span></span><br><span class="line">    <span class="comment"># oceanbase root server list</span></span><br><span class="line">    <span class="comment"># format: ip:mysql_port,ip:mysql_port</span></span><br><span class="line">    <span class="attr">rs_list:</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span><span class="string">:2881</span></span><br><span class="line">    <span class="attr">enable_cluster_checkout:</span> <span class="literal">false</span></span><br><span class="line">    <span class="comment"># observer cluster name, consistent with oceanbase-ce&#x27;s appname</span></span><br><span class="line">    <span class="attr">cluster_name:</span> <span class="string">obdemo</span></span><br><span class="line">    <span class="attr">obproxy_sys_password:</span>  <span class="string">proxySYSPWD123</span> <span class="comment"># obproxy sys user password, can be empty</span></span><br><span class="line">    <span class="attr">observer_sys_password:</span> <span class="string">proxyROPWD123</span> <span class="comment"># proxyro user pasword, consistent with oceanbase-ce&#x27;s proxyro_password, can be empty</span></span><br><span class="line">    <span class="attr">automatic_match_work_thread:</span> <span class="literal">false</span></span><br><span class="line">    <span class="attr">work_thread_num:</span> <span class="number">12</span></span><br><span class="line">    <span class="attr">xflush_log_level:</span> <span class="string">ERROR</span></span><br><span class="line">    <span class="attr">monitor_log_level:</span> <span class="string">ERROR</span></span><br><span class="line">    <span class="attr">syslog_level:</span> <span class="string">ERROR</span></span><br><span class="line">    <span class="attr">log_dir_size_threshold:</span> <span class="string">1G</span></span><br><span class="line">    <span class="attr">enable_compression_protocol:</span> <span class="literal">false</span></span><br></pre></td></tr></table></figure>
+
+<p>里面的 <code>datafile_size</code> 写的很小（<code>5G</code>）。如果你磁盘空间很大，可以后期对 OB集群里数据文件扩容。</p>
+<h2 id="其他参考"><a href="#其他参考" class="headerlink" title="其他参考"></a>其他参考</h2><p>有问题欢迎留言，或者登录 OB 社区版官网问答区（<code>https://open.oceanbase.com/answer</code>) ，或者 OB社区版钉钉群直接跟开发和其他用户沟通交流。</p>
+<p><img src="/images/16296964112262.jpg"></p>
+]]></content>
+      <categories>
+        <category>运维</category>
+      </categories>
+      <tags>
+        <tag>OCEANBASE</tag>
+        <tag>OCEANBASE-CE</tag>
+        <tag>DOCKER</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>DB2 迁移 OceanBase 实践总结</title>
     <url>/2021/08/30/DB2-%E8%BF%81%E7%A7%BB-OceanBase-%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/</url>
     <content><![CDATA[<p>IBM DB2 是美国IBM公司开发的一套关系型数据库管理系统，它主要的运行环境为UNIX（包括IBM自家的AIX）、Linux、IBM i（旧称OS/400）、z/OS，以及Windows服务器版本。其中 LINUX、UNIX 和Windows 平台又简称 LUW 开放平台。客户包含 省农信、农商行 以及一些中字头金融机构。</p>
@@ -188,85 +459,8 @@
         <category>架构</category>
       </categories>
       <tags>
+        <tag>OCEANBASE</tag>
         <tag>DB2</tag>
-        <tag>OCEANBASE</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>三步体验 OceanBase 社区版</title>
-    <url>/2021/08/30/%E4%B8%89%E6%AD%A5%E4%BD%93%E9%AA%8C-OceanBase-%E7%A4%BE%E5%8C%BA%E7%89%88/</url>
-    <content><![CDATA[<h2 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h2><p>本文是个人基于 OceanBase 社区版构建了一个容器镜像，仅用于学习研究。只要你有一个 4C10G的笔记本可以联网，你就可以在5分钟内将 OceanBase 社区版跑起来。</p>
-<h2 id="前提条件"><a href="#前提条件" class="headerlink" title="前提条件"></a>前提条件</h2><p>请确保宿主机的可用资源满足下面要求：</p>
-<ul>
-<li>逻辑 CPU 不少于4个</li>
-<li>可用内存不少于 10G，并且 docker 容器内存限制不少于10G</li>
-<li>空间不少于10G</li>
-</ul>
-<h2 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h2><p>笔记本需要安装 Docker，并且在 Docker 的设置里将容器使用的内存上限调整到 10 G 。下面是 Mac 版本的 Docker 容器设置。</p>
-<span id="more"></span>
-
-
-<p><img src="/images/16301420583501.jpg"></p>
-<h3 id="下载镜像和启动容器"><a href="#下载镜像和启动容器" class="headerlink" title="下载镜像和启动容器"></a>下载镜像和启动容器</h3><p>下载镜像，文件大概 2.3G 不到。具体时间取决于连接 <code>https://hub.docker.com/repository/docker/obpilot/oceanbase-ce</code> 网站的网速。</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker pull obpilot/oceanbase-ce:latest</span><br><span class="line"></span><br><span class="line">docker images</span><br><span class="line">REPOSITORY                                            TAG                     IMAGE ID            CREATED             SIZE</span><br><span class="line">obpilot/oceanbase-ce                                  latest                  0017baaa9d87        23 minutes ago      2.24GB</span><br><span class="line"></span><br><span class="line">docker run -itd -m 10G --name oceanbase-ce  obpilot/oceanbase-ce:latest</span><br><span class="line"></span><br><span class="line">docker ps</span><br><span class="line">CONTAINER ID        IMAGE                         COMMAND                  CREATED             STATUS              PORTS                                                                     NAMES</span><br><span class="line">e5dd6da0aa8d        obpilot/oceanbase-ce:latest   <span class="string">&quot;/bin/bash&quot;</span>              40 minutes ago      Up 40 minutes                                                                                 oceanbase-ce</span><br></pre></td></tr></table></figure>
-
-<p>启动容器的时候，可选的是如果有独立盘目录 <code>/data</code>，可以加上 <code>-v /data:/data </code> 参数。</p>
-<!-- more -->
-
-<h3 id="登录容器，启动-OB-集群"><a href="#登录容器，启动-OB-集群" class="headerlink" title="登录容器，启动 OB 集群"></a>登录容器，启动 OB 集群</h3><p>容器内已经部署了 OB 社区版自动化部署工具 OBD 。使用 OBD 启动集群，第一次会初始化集群，时间需要2-3分钟（取决于宿主机性能）。</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">docker <span class="built_in">exec</span> -it oceanbase-ce bash</span><br><span class="line"></span><br><span class="line">obd cluster list</span><br><span class="line"></span><br><span class="line">obd cluster start obdemo</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>下面是启动输出。</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">[admin@e5dd6da0aa8d ~]$ obd cluster list</span><br><span class="line">+------------------------------------------------------------+</span><br><span class="line">|                        Cluster List                        |</span><br><span class="line">+--------+---------------------------------+-----------------+</span><br><span class="line">| Name   | Configuration Path              | Status (Cached) |</span><br><span class="line">+--------+---------------------------------+-----------------+</span><br><span class="line">| obdemo | /home/admin/.obd/cluster/obdemo | deployed        |</span><br><span class="line">+--------+---------------------------------+-----------------+</span><br><span class="line">[admin@e5dd6da0aa8d ~]$ obd cluster start obdemo</span><br><span class="line">Get <span class="built_in">local</span> repositories and plugins ok</span><br><span class="line">Open ssh connection ok</span><br><span class="line">Cluster param config check ok</span><br><span class="line">Check before start observer ok</span><br><span class="line">Check before start obproxy ok</span><br><span class="line">Start observer ok</span><br><span class="line">observer program health check ok</span><br><span class="line">Connect to observer ok</span><br><span class="line">Initialize cluster</span><br><span class="line">Cluster bootstrap ok</span><br><span class="line">Wait <span class="keyword">for</span> observer init ok</span><br><span class="line">+---------------------------------------------+</span><br><span class="line">|                   observer                  |</span><br><span class="line">+-----------+---------+------+-------+--------+</span><br><span class="line">| ip        | version | port | zone  | status |</span><br><span class="line">+-----------+---------+------+-------+--------+</span><br><span class="line">| 127.0.0.1 | 3.1.0   | 2881 | zone1 | active |</span><br><span class="line">+-----------+---------+------+-------+--------+</span><br><span class="line"></span><br><span class="line">Start obproxy ok</span><br><span class="line">obproxy program health check ok</span><br><span class="line">Connect to obproxy ok</span><br><span class="line">Initialize cluster</span><br><span class="line">+---------------------------------------------+</span><br><span class="line">|                   obproxy                   |</span><br><span class="line">+-----------+------+-----------------+--------+</span><br><span class="line">| ip        | port | prometheus_port | status |</span><br><span class="line">+-----------+------+-----------------+--------+</span><br><span class="line">| 127.0.0.1 | 2883 | 2884            | active |</span><br><span class="line">+-----------+------+-----------------+--------+</span><br><span class="line">obdemo running</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>admin 用户的密码是 : <code>adminPWD123</code> . 您可以使用 sudo yum 安装软件包。</p>
-<h3 id="创建-OB-实例（租户）"><a href="#创建-OB-实例（租户）" class="headerlink" title="创建 OB 实例（租户）"></a>创建 OB 实例（租户）</h3><p>默认初始化的 OB 集群还没有创建业务实例。需要手动建一个。</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">obclient -h127.1 -uroot@sys<span class="comment">#obdemo -P2883 -prootPWD123 -c -A oceanbase</span></span><br><span class="line"></span><br><span class="line">alter resource unit sys_unit_config min_cpu=5;</span><br><span class="line">-- 创建资源单元规格</span><br><span class="line">CREATE resource unit S4C1G max_cpu=4, min_cpu=4, max_memory=<span class="string">&#x27;1G&#x27;</span>, min_memory=<span class="string">&#x27;1G&#x27;</span>, max_iops=10000, min_iops=1000, max_session_num=1000000, max_disk_size=<span class="string">&#x27;1024G&#x27;</span>; </span><br><span class="line"></span><br><span class="line">-- 创建资源池（分配资源）</span><br><span class="line">CREATE resource pool my_pool unit = <span class="string">&#x27;S4C1G&#x27;</span>, unit_num = 1;</span><br><span class="line"></span><br><span class="line">-- 创建实例（mysql类型）</span><br><span class="line">create tenant obmysql resource_pool_list=(<span class="string">&#x27;my_pool&#x27;</span>), primary_zone=<span class="string">&#x27;RANDOM&#x27;</span>,comment <span class="string">&#x27;mysql tenant/instance&#x27;</span>, charset=<span class="string">&#x27;utf8&#x27;</span> <span class="built_in">set</span> ob_tcp_invited_nodes=<span class="string">&#x27;%&#x27;</span>, ob_compatibility_mode=<span class="string">&#x27;mysql&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="built_in">exit</span>;</span><br></pre></td></tr></table></figure>
-
-<h3 id="登录使用-OB-实例"><a href="#登录使用-OB-实例" class="headerlink" title="登录使用 OB 实例"></a>登录使用 OB 实例</h3><p>默认创建的 OB 实例，连接密码是空。 登录后可以导入 bmsql.sql 中的建库建表语句。</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">obclient -h 127.1 -uroot@obmysql<span class="comment">#obdemo -P2883 -p -c -A test</span></span><br><span class="line"></span><br><span class="line">empty password.</span><br><span class="line"></span><br><span class="line">show databases;</span><br><span class="line"></span><br><span class="line"><span class="built_in">source</span> bmsql.sql</span><br></pre></td></tr></table></figure>
-
-<p>成功后，输出</p>
-<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">MySQL [tpccdb]<span class="operator">&gt;</span> <span class="keyword">show</span> tables;</span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+</span></span><br><span class="line"><span class="operator">|</span> Tables_in_tpccdb <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+</span></span><br><span class="line"><span class="operator">|</span> bmsql_config     <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_customer   <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_district   <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_history    <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_item       <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_new_order  <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_oorder     <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_order_line <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_stock      <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_warehouse  <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+</span></span><br><span class="line"><span class="number">10</span> <span class="keyword">rows</span> <span class="keyword">in</span> <span class="keyword">set</span> (<span class="number">0.003</span> sec)</span><br><span class="line"></span><br><span class="line">MySQL [tpccdb]<span class="operator">&gt;</span> <span class="keyword">show</span> tablegroups;</span><br><span class="line"><span class="operator">+</span><span class="comment">-----------------+------------------+---------------+</span></span><br><span class="line"><span class="operator">|</span> Tablegroup_name <span class="operator">|</span> Table_name       <span class="operator">|</span> Database_name <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">-----------------+------------------+---------------+</span></span><br><span class="line"><span class="operator">|</span> oceanbase       <span class="operator">|</span> <span class="keyword">NULL</span>             <span class="operator">|</span> <span class="keyword">NULL</span>          <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_customer   <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_district   <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_history    <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_new_order  <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_oorder     <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_order_line <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_stock      <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_warehouse  <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">-----------------+------------------+---------------+</span></span><br><span class="line"><span class="number">9</span> <span class="keyword">rows</span> <span class="keyword">in</span> <span class="keyword">set</span> (<span class="number">0.008</span> sec)</span><br></pre></td></tr></table></figure>
-
-<h2 id="附录1：Docker-镜像制作方法"><a href="#附录1：Docker-镜像制作方法" class="headerlink" title="附录1：Docker 镜像制作方法"></a>附录1：Docker 镜像制作方法</h2><p>第一次使用 Dockerfile 构建镜像，还不是很娴熟，功能做的比较粗糙。下面是 Dockerfile</p>
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">cat Dockerfile</span><br><span class="line"></span><br><span class="line">FROM centos:latest</span><br><span class="line">MAINTAINER obpilot</span><br><span class="line">COPY ./obdemo.yaml /tmp/</span><br><span class="line"></span><br><span class="line">VOLUME [<span class="string">&quot;/data&quot;</span>]</span><br><span class="line"></span><br><span class="line">RUN yum -y install tree net-tools vim sudo passwd \</span><br><span class="line">	&amp;&amp; yum -y install mariadb-connector-c \</span><br><span class="line">	&amp;&amp; yum install -y yum-utils \</span><br><span class="line">	&amp;&amp; yum-config-manager --add-repo https://mirrors.aliyun.com/oceanbase/OceanBase.repo \</span><br><span class="line">	&amp;&amp; yum install -y ob-deploy obclient \</span><br><span class="line">	&amp;&amp; useradd admin &amp;&amp; <span class="built_in">echo</span> <span class="string">&#x27;admin:adminPWD123&#x27;</span> | chpasswd \</span><br><span class="line">	&amp;&amp; sed -i <span class="string">&#x27;$a\admin    ALL=(ALL)	ALL&#x27;</span> /etc/sudoers \</span><br><span class="line">	&amp;&amp; mkdir -p /data/1 /data/log1  \</span><br><span class="line">	&amp;&amp; chown -R admin.admin /data/ /tmp/ \</span><br><span class="line">	&amp;&amp; su admin -c  <span class="string">&quot;obd cluster deploy obdemo -c /tmp/obdemo.yaml&quot;</span></span><br><span class="line"></span><br><span class="line">USER admin</span><br><span class="line">WORKDIR /home/admin</span><br><span class="line">COPY ./bmsql.sql /home/admin/</span><br><span class="line">COPY ./readme.md /home/admin/</span><br></pre></td></tr></table></figure>
-
-<h2 id="附录2-OBD-集群初始化配置文件"><a href="#附录2-OBD-集群初始化配置文件" class="headerlink" title="附录2: OBD 集群初始化配置文件"></a>附录2: OBD 集群初始化配置文件</h2><p>OBD 是 OB 社区版推出的自动化部署工具，现在功能也越来越成熟好用了。开源网站（<code>https://github.com/oceanbase/obdeploy/tree/master/example</code>）提供了几个配置模板文件。这里是修改后的配置文件。部署的是单机版 OB，监听本地 IP。</p>
-<figure class="highlight yaml"><table><tr><td class="code"><pre><span class="line"><span class="comment">## Only need to configure when remote login is required</span></span><br><span class="line"><span class="comment"># user:</span></span><br><span class="line"><span class="comment">#   username: your username</span></span><br><span class="line"><span class="comment">#   password: your password if need</span></span><br><span class="line"><span class="comment">#   key_file: your ssh-key file path if need</span></span><br><span class="line"><span class="comment">#   port: your ssh port, default 22</span></span><br><span class="line"><span class="comment">#   timeout: ssh connection timeout (second), default 30</span></span><br><span class="line"><span class="attr">oceanbase-ce:</span></span><br><span class="line">  <span class="attr">servers:</span></span><br><span class="line">    <span class="comment"># Please don&#x27;t use hostname, only IP can be supported</span></span><br><span class="line">    <span class="bullet">-</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span></span><br><span class="line">  <span class="attr">global:</span></span><br><span class="line">    <span class="comment">#  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.</span></span><br><span class="line">    <span class="attr">home_path:</span> <span class="string">/home/admin/oceanbase-ce</span></span><br><span class="line">    <span class="comment"># The directory for data storage. The default value is $home_path/store.</span></span><br><span class="line">    <span class="comment"># data_dir: /data/1</span></span><br><span class="line">    <span class="comment"># The directory for clog, ilog, and slog. The default value is the same as the data_dir value.</span></span><br><span class="line">    <span class="attr">redo_dir:</span> <span class="string">/data/log1</span></span><br><span class="line">    <span class="comment"># Please set devname as the network adaptor&#x27;s name whose ip is  in the setting of severs.</span></span><br><span class="line">    <span class="comment"># if set severs as &quot;127.0.0.1&quot;, please set devname as &quot;lo&quot;</span></span><br><span class="line">    <span class="comment"># if current ip is 192.168.1.10, and the ip&#x27;s network adaptor&#x27;s name is &quot;eth0&quot;, please use &quot;eth0&quot;</span></span><br><span class="line">    <span class="attr">devname:</span> <span class="string">lo</span></span><br><span class="line">    <span class="attr">mysql_port:</span> <span class="number">2881</span> <span class="comment"># External port for OceanBase Database. The default value is 2881.</span></span><br><span class="line">    <span class="attr">rpc_port:</span> <span class="number">2882</span> <span class="comment"># Internal port for OceanBase Database. The default value is 2882.</span></span><br><span class="line">    <span class="attr">zone:</span> <span class="string">zone1</span></span><br><span class="line">    <span class="attr">cluster_id:</span> <span class="number">1</span></span><br><span class="line">    <span class="comment"># please set memory limit to a suitable value which is matching resource.</span></span><br><span class="line">    <span class="attr">memory_limit:</span> <span class="string">8G</span> <span class="comment"># The maximum running memory for an observer</span></span><br><span class="line">    <span class="attr">system_memory:</span> <span class="string">4G</span> <span class="comment"># The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.</span></span><br><span class="line">    <span class="attr">stack_size:</span> <span class="string">512K</span></span><br><span class="line">    <span class="attr">cpu_count:</span> <span class="number">16</span></span><br><span class="line">    <span class="attr">cache_wash_threshold:</span> <span class="string">1G</span></span><br><span class="line">    <span class="attr">__min_full_resource_pool_memory:</span> <span class="number">268435456</span></span><br><span class="line">    <span class="attr">workers_per_cpu_quota:</span> <span class="number">10</span></span><br><span class="line">    <span class="attr">schema_history_expire_time:</span> <span class="string">1d</span></span><br><span class="line">    <span class="comment"># The value of net_thread_count had better be same as cpu&#x27;s core number.</span></span><br><span class="line">    <span class="attr">net_thread_count:</span> <span class="number">4</span></span><br><span class="line">    <span class="attr">major_freeze_duty_time:</span> <span class="string">Disable</span></span><br><span class="line">    <span class="attr">minor_freeze_times:</span> <span class="number">10</span></span><br><span class="line">    <span class="attr">enable_separate_sys_clog:</span> <span class="number">0</span></span><br><span class="line">    <span class="attr">enable_merge_by_turn:</span> <span class="literal">FALSE</span></span><br><span class="line">    <span class="comment">#datafile_disk_percentage: 20 # The percentage of the data_dir space to the total disk space. This value takes effect only when datafile_size is 0. The default value is 90.</span></span><br><span class="line">    <span class="attr">datafile_size:</span> <span class="string">5G</span></span><br><span class="line">    <span class="attr">syslog_level:</span> <span class="string">ERROR</span> <span class="comment"># System log level. The default value is INFO.</span></span><br><span class="line">    <span class="attr">enable_syslog_wf:</span> <span class="literal">false</span> <span class="comment"># Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.</span></span><br><span class="line">    <span class="attr">enable_syslog_recycle:</span> <span class="literal">true</span> <span class="comment"># Enable auto system log recycling or not. The default value is false.</span></span><br><span class="line">    <span class="attr">max_syslog_file_count:</span> <span class="number">4</span> <span class="comment"># The maximum number of reserved log files before enabling auto recycling. The default value is 0.</span></span><br><span class="line">    <span class="comment"># observer cluster name, consistent with obproxy&#x27;s cluster_name</span></span><br><span class="line">    <span class="attr">appname:</span> <span class="string">obdemo</span></span><br><span class="line">    <span class="attr">root_password:</span> <span class="string">rootPWD123</span> <span class="comment"># root user password, can be empty</span></span><br><span class="line">    <span class="attr">proxyro_password:</span>  <span class="string">proxyROPWD123</span> <span class="comment"># proxyro user pasword, consistent with obproxy&#x27;s observer_sys_password, can be empty</span></span><br><span class="line"><span class="attr">obproxy:</span></span><br><span class="line">  <span class="attr">servers:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span></span><br><span class="line">  <span class="attr">global:</span></span><br><span class="line">    <span class="attr">listen_port:</span> <span class="number">2883</span> <span class="comment"># External port. The default value is 2883.</span></span><br><span class="line">    <span class="attr">prometheus_listen_port:</span> <span class="number">2884</span> <span class="comment"># The Prometheus port. The default value is 2884.</span></span><br><span class="line">    <span class="attr">home_path:</span> <span class="string">/home/admin/obproxy</span></span><br><span class="line">    <span class="comment"># oceanbase root server list</span></span><br><span class="line">    <span class="comment"># format: ip:mysql_port,ip:mysql_port</span></span><br><span class="line">    <span class="attr">rs_list:</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span><span class="string">:2881</span></span><br><span class="line">    <span class="attr">enable_cluster_checkout:</span> <span class="literal">false</span></span><br><span class="line">    <span class="comment"># observer cluster name, consistent with oceanbase-ce&#x27;s appname</span></span><br><span class="line">    <span class="attr">cluster_name:</span> <span class="string">obdemo</span></span><br><span class="line">    <span class="attr">obproxy_sys_password:</span>  <span class="string">proxySYSPWD123</span> <span class="comment"># obproxy sys user password, can be empty</span></span><br><span class="line">    <span class="attr">observer_sys_password:</span> <span class="string">proxyROPWD123</span> <span class="comment"># proxyro user pasword, consistent with oceanbase-ce&#x27;s proxyro_password, can be empty</span></span><br><span class="line">    <span class="attr">automatic_match_work_thread:</span> <span class="literal">false</span></span><br><span class="line">    <span class="attr">work_thread_num:</span> <span class="number">12</span></span><br><span class="line">    <span class="attr">xflush_log_level:</span> <span class="string">ERROR</span></span><br><span class="line">    <span class="attr">monitor_log_level:</span> <span class="string">ERROR</span></span><br><span class="line">    <span class="attr">syslog_level:</span> <span class="string">ERROR</span></span><br><span class="line">    <span class="attr">log_dir_size_threshold:</span> <span class="string">1G</span></span><br><span class="line">    <span class="attr">enable_compression_protocol:</span> <span class="literal">false</span></span><br></pre></td></tr></table></figure>
-
-<p>里面的 <code>datafile_size</code> 写的很小（<code>5G</code>）。如果你磁盘空间很大，可以后期对 OB集群里数据文件扩容。</p>
-<h2 id="其他参考"><a href="#其他参考" class="headerlink" title="其他参考"></a>其他参考</h2><p>有问题欢迎留言，或者登录 OB 社区版官网问答区（<code>https://open.oceanbase.com/answer</code>) ，或者 OB社区版钉钉群直接跟开发和其他用户沟通交流。</p>
-<p><img src="/images/16296964112262.jpg"></p>
-]]></content>
-      <categories>
-        <category>运维</category>
-      </categories>
-      <tags>
-        <tag>OCEANBASE</tag>
-        <tag>OCEANBASE-CE</tag>
-        <tag>DOCKER</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>Hello World</title>
-    <url>/2021/08/30/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.<br>&lt;– more –&gt;</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-]]></content>
-      <tags>
-        <tag>hexo</tag>
       </tags>
   </entry>
   <entry>
@@ -465,200 +659,6 @@
       <tags>
         <tag>OCEANBASE</tag>
         <tag>DATAX</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>OceanBase 部署架构实践总结</title>
-    <url>/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/</url>
-    <content><![CDATA[<p>本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。</p>
-<h2 id="标准部署形态"><a href="#标准部署形态" class="headerlink" title="标准部署形态"></a>标准部署形态</h2><p>首先来一个 OB 最基础的最中规中矩的部署架构图。</p>
-<p><img src="/images/16275469181084.jpg"></p>
-<p>&lt;– more –&gt;</p>
-<p>这个图信息量很大，下面一一说明。</p>
-<p>部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环境标准化。</p>
-<h3 id="部署环境标准化"><a href="#部署环境标准化" class="headerlink" title="部署环境标准化"></a>部署环境标准化</h3><p>不同客户的机器配置也不尽相同，OB 会对软硬件提一些基本要求。然后提供一个工具对机器进行自动初始化。主要是 OS 内核和会话参数的设置、文件系统的划分、用户和相关目录的创建。<br>早期的时候需要命令行下每个机器挨个执行。<br>现在提供了一个 OAT 产品（有图形界面），挨个添加机器，点点鼠标，自动初始化环境。现在一次初始化十几台机器也不是问题。</p>
-<p>OAT 怎么部署？<br>OAT 为了适应各种客户环境，选择了 docker 技术，只要启动一个 docker 容器就可以用。</p>
-<p>初始化机器环境只是 OAT 基本功能，还可以自动化部署 OCP、OMS、ODC 等产品。这些产品都提供 docker 镜像，都以容器形式运行。就不怕用户环境的千差万别了。</p>
-<p>早期没有 OAT，则在命令行下用 OB 提供的软件自动化部署 OCP 容器。</p>
-<span id="more"></span>
-
-<h3 id="关于-OCP"><a href="#关于-OCP" class="headerlink" title="关于 OCP"></a>关于 OCP</h3><ul>
-<li>OCP 以集群形式运行，有高可用和负载均衡能力。所以生产环境建议 OCP 有3台服务器。机器预算有限的客户，可以选择用1台服务器部署 OCP。缺点就是没有高可用。</li>
-<li>每个 OCP 服务器会有三个 docker 容器，分别对应：OCP 应用、OBPROXY 容器和 OB 元数据库容器。这个 OBPROXY 是给 OCP 自己用的，OB 元数据库容器是给 OCP 用的，不给业务用。不过有时候也给 OMS 和 ODC 存放元数据用。</li>
-<li>元数据库是 OB，所以高可用需要 3 台服务器。</li>
-<li>OCP 访问 元数据库 OB 是通过 OBPROXY 容器。当有三台的时候，需要对多个 OBPROXY 提供一个 VIP 或者域名 进行负载均衡和高可用。同理，多个 OCP 容器也许要这么一个 VIP 或者 域名。</li>
-<li>OCP 集群可以部署在一个机房，也可以部署在三个机房，哪怕其中一个机房是异地的也行。</li>
-<li>OCP 集群还可以有备集群，主要用在双机房部署需求里，以及两地三中心里异地机房单独部署用。</li>
-</ul>
-<h3 id="关于-OB"><a href="#关于-OB" class="headerlink" title="关于 OB"></a>关于 OB</h3><ul>
-<li>OB 是一个单进程的软件，进程名：<code>observer</code> 。生产环境每个 OB 机器数就一个进程。所以说 OB 集群机器的角色地位都是平等的。</li>
-<li>OB 每个进程监听2个端口：默认是 2881 和 2882 ，可以指定。开发测试学习 OB 如果只有一台服务器，可以在单机上启动多个 OB 进程（监听不同端口）来搭建一个 OB 集群。</li>
-<li>生产环境 OB 都是3台机器起步，推荐三副本（数据有三份）。也有的会选择五副本。副本数越多，抵抗故障风险的能力越强。</li>
-</ul>
-<p>大部分客户案例里，OB 集群的机器数是 3 或 5 的倍数。有的人会觉得客户比较浪费机器。这个却未必，因为 OB 还有多租户和多活的能力。</p>
-<h3 id="多租户"><a href="#多租户" class="headerlink" title="多租户"></a>多租户</h3><p>OB 以集群形态部署，提供多租户（多实例）能力给不同业务用。</p>
-<p>首先看看 OB的多实例示意图。</p>
-<p><img src="/images/16275509356582.jpg"></p>
-<ul>
-<li>重申：每个节点只有一个 OB 进程。OB 的实例不是独立的进程，是 OB 进程内部的线程集。</li>
-<li>多实例指的是：实例1、实例2和实例3。对于每个实例，在三台机器上都有数据，属于一个实例，不是三个实例。所以业务只有一个连接字符串。为了便于理解，示意图看起来像是三个实例，实际同名的就表示一个实例。物理形态是三个 OB 进程内部的线程集。</li>
-<li>每个实例的三份数据可以简单理解为一个主两个备。主会向备同步数据。默认只有实例的主被访问到（提供读写服务）。</li>
-</ul>
-<p>如果是上面这个部署图，那是给人感觉有点浪费机器。但是 OB 很灵活，它还可以是下面这种部署形态。</p>
-<p><img src="/images/16275511037010.jpg"></p>
-<ul>
-<li>OB 可以在线调整实例的主在哪个区域（ZONE）的机器上。这个就对应了传统的主备切换了。OB 里是在线做，不停机，业务影响很小，甚至不感知。</li>
-<li>当所有机器上都有实例的主的时候，这台机器就不空闲了，也就不浪费了。</li>
-</ul>
-<p>如果只是上面这种还好理解。实际上 OB 的灵活性远不止这些。还可以下面这种部署形态。</p>
-<p><img src="/images/16275514123097.jpg"></p>
-<p>每个实例 1 的三份数据都是主，彼此双向同步。有人说，这怎么可能？<br>OB 确实可以这样，这里的奥秘就在于 OB 里主备的粒度很细，可以到表级别（实际更细到表的分区）。</p>
-<p><img src="/images/16275518612311.jpg"></p>
-<ul>
-<li>分区表是多分区，如表 T1 ，有 2 个分区：分区 1 和分区 2 。</li>
-<li>普通的表是单分区，只有一个分区。如 T2 。</li>
-<li>每个分区在实例里（或者在集群里）都有三份数据，这个就是三副本。角色：1 个主副本 2个 备副本。</li>
-<li>默认情况下只有主副本提供读写服务，备副本不提供服务。特殊情况下有需要的话，备副本也可以提供只读服务，主要是读写分离考虑。</li>
-</ul>
-<p><strong>当机器上有主副本的时候，就可以认为实例在这台机器上也提供服务了。自然，这个机器也不会空闲。</strong> 这就是 OB 的多活能力。</p>
-<p>OB 的多租户使得机器资源使用粒度更精细，OB 的多活能力使得机器利用率更高，所以当业务体量有一定规模时，OB 可以用更少的机器满足业务需求。</p>
-<p>所以，你还认为 OB 浪费机器吗？</p>
-<p>如果你还是这么认为，那 OB 还有更超出你想象的部署形态。<br>在那之前，先看看 OB 扩展后的形态。</p>
-<h2 id="扩容后的-OB-部署形态"><a href="#扩容后的-OB-部署形态" class="headerlink" title="扩容后的 OB 部署形态"></a>扩容后的 OB 部署形态</h2><p>假设现在 OB 集群 从 1-1-1 扩容到 2-2-2 。可以变成下面这个形态。</p>
-<p><img src="/images/16276125524371.jpg"></p>
-<p>或者是下面这个形态</p>
-<p><img src="/images/16276124932514.jpg"></p>
-<p>或者是下面这个形态</p>
-<p><img src="/images/16276125155522.jpg"></p>
-<p>纵向看，每2台机器是一个 Zone。OB 实例可以控制主副本在哪个 ZONE 或者在哪几个 ZONE。所有实例的主副本都在一个 Zone，就是单机房提供服务，其他两个机房都是备机房。所有实例的主副本都在两个 Zone，那就是双活模式。所有实例的主副本分散在所有 Zone，那就是多活模式。</p>
-<p>上面图更突出 OB 灵活性的是 实例 1 和 实例 2 都只用了 3台机器的资源，实例 3 用了6台机器的资源。实例 3依然是3副本，只不过每份数据分布在2台服务器上。<br>这些可以在线变换，这就是 OB 集群和租户的在线弹性伸缩能力。用户只需要改变策略，数据迁移是 OB 内部事情。</p>
-<h2 id="资源异构的部署形态"><a href="#资源异构的部署形态" class="headerlink" title="资源异构的部署形态"></a>资源异构的部署形态</h2><p>标准部署形态中，OB 集群三台机器资源都是对等的，每个 Zone 机器数量一样。每个实例在三个 Zone 里的资源大小也基本保持一致。这是最佳实践建议。但是技术上，为了满足一些客户项目机器预算有限，OB 是可以接受三个Zone 资源异构。</p>
-<p>OB 的分区副本有多种类型：</p>
-<ul>
-<li>全功能副本（FULL）：包含数据和事务日志，参与高可用投票（选举），可以候选为主副本。</li>
-<li>数据副本（DATA）：只包含数据，不存储事务日志，不参与高可用投票（选举）。仅用于测试验证，生产环境没有用过。</li>
-<li>日志副本（LOGONLY)：只包含事务日志，参与高可用投票（选举），但是不会当选为主副本（因为没有数据）。日志副本不能转换为其他副本类型。</li>
-<li>只读副本（READONLY)：包含数据和事务日志，不参与高可用投票（选举），不可以候选为主副本。只能读不能写，用于读写分离场景。可以在线来回转换为全功能副本。</li>
-</ul>
-<p><img src="/images/16276126484769.jpg"></p>
-<h3 id="日志副本"><a href="#日志副本" class="headerlink" title="日志副本"></a>日志副本</h3><p>日志副本不包含数据，使得可以节省磁盘空间。CPU和内存方面也可以适当减少（内存不能太小，不要低于8G）。<strong>日志副本的内存大小会限制整个实例能创建的分区数量，所以不要太小。</strong>日志副本的特性，使得下面这种部署形态也是可以的。图中矩形框的大小可以理解为资源的大小（资源就是CPU、内存和空间）。</p>
-<p><img src="/images/16276145261791.jpg"></p>
-<p>架构说明：</p>
-<ul>
-<li>ZONE1 和 ZONE2 中实例的数据副本都是全功能副本，ZONE3 中实例的数据副本都是日志副本。</li>
-<li>日志副本的资源可以少一些。最少不要低于2C8G（尤其是内存8G）。内存大小还要考虑实例里的分区数目。</li>
-<li>这里使用日志副本，通过适当的排列，可以实现每个实例提供服务的副本可以使用更多的机器资源。</li>
-</ul>
-<p>上面这种用法只是进一步提升了机器资源利用率，并没有明显减少机器，下面这种玩法就更高级了。<br><img src="/images/16276446515060.jpg"></p>
-<p>架构说明：</p>
-<ul>
-<li>ZONE1 和 ZONE2 分别是 2 台服务器，ZONE3 分别是 1 台服务器。集群的架构简称为 2-2-1 。</li>
-<li>ZONE1 和 ZONE2 中实例的数据副本都是全功能副本，ZONE3 中实例的数据副本都是日志副本。</li>
-<li>实际运用的时候也可以 3-3-1 。但是要看看这个 1 的机器资源大小。尤其是 内存大小。当租户很多的时候，每个日志副本内存至少8G，ZONE3 的1台机器承载的实例数量也是有限的。所以 4-4-1 可能很危险，但可以 4-4-2 。资源是关键。</li>
-</ul>
-<p>比如说下面这个就是一个业务场景的资源布局图。<br><img src="/images/16276373898734.jpg"></p>
-<p>架构说明：</p>
-<ul>
-<li>集群机器 5 台，其中 2 台机器的 CPU 要少一些。集群架构 2-2-1 ， Zone1 使用了日志副本。</li>
-<li>不同实例都设置一个 PRIMARY_ZONE ，控制主副本的位置，以及备用备副本的位置。</li>
-<li>资源大小：主副本 &gt; 备副本 &gt;&gt; 日志副本。 不同租户的主副本、备副本和日志副本交叉部署，让提供服务的主副本资源能力最大化。</li>
-<li>实例的资源大小、实例的副本分布位置（机器），都是可以在OCP 中在线调整，操作非常方便。涉及到的数据迁移是 OB 内部事情，不需要 DBA 手动操作。并且迁移期间，业务读写不停。也不怕机器故障（有高可用）。</li>
-</ul>
-<h3 id="只读副本"><a href="#只读副本" class="headerlink" title="只读副本"></a>只读副本</h3><p>默认情况下 OB 的三副本只有主副本提供读写服务，备副本不提供服务。但是通过 OBPROXY的会话设置或者 SQL语句设置，业务也可以读备副本。这就是读写分离。<br>不过由于 OB 特殊的多实例能力，以及多活，这种读备副本的读写分离意义不是特别大。如果是大量的读写分离需求，建议部署只读副本。</p>
-<p><img src="/images/16277023370498.jpg"></p>
-<p>架构说明：</p>
-<ul>
-<li>ZONE4 的机器里部署的是只读副本，机器数可以跟其他 ZONE 不同，可以在线调整。</li>
-<li>只读副本的建立是按实例配置的，实例只读副本的资源也是可以独立设置的（根据需要在线调整）。每个实例可以配置 1 个或多个 只读副本（2个只读副本就要2台机器）。这个主要看都承担的压力。</li>
-<li>只读副本只承担读服务，不能接受写请求。实际上写请求不会路由到只读副本上。关于路由以后再单独介绍。</li>
-</ul>
-<p>只读副本的数据是从主副本同步过来的，理论上会有延时，但是数据绝对不会错。只读副本自身故障后恢复时，数据同步可以自动恢复，不需要 DBA 介入处理数据同步。只读副本也可以在线重建。所以说 OB 的运维是非常方便的，只有体验过一次的人才能理解。</p>
-<p>除了资源异构，OB 还有很多种混和部署方案。</p>
-<h2 id="混合部署方案"><a href="#混合部署方案" class="headerlink" title="混合部署方案"></a>混合部署方案</h2><h3 id="国产化方案"><a href="#国产化方案" class="headerlink" title="国产化方案"></a>国产化方案</h3><p>OB 集群支持国产化产品：</p>
-<ul>
-<li>服务器：华为泰山</li>
-<li>CPU： 鲲鹏 920、海光 XC的CPU （5280 和 7280）、飞腾2000 。</li>
-<li>OS ：麒麟系统（中标V7/银河V10，后合并了)、统信 UOS 。</li>
-</ul>
-<p>OB 集群可以全部部署在国产化服务器上并使用国产操作系统。外部有代表性的客户案例有宇宙行的对公理财业务。</p>
-<p>当然有些客户可能对国产服务器和软件还有些担心。OB 也支持下面这些混搭方案。</p>
-<ul>
-<li>主集群是 x86_64 + redhat/centos , 备集群是 aarch_64 + 麒麟 OS 。代表案例是某头部寿险业务。</li>
-<li>主集群的多数派 Zone 是 x86_64 + redhat/centos，少数派 Zone 是 aarch_64 + 麒麟 OS 。并且可以逐步用国产服务器替换商用服务器。代表案例是支付宝某核心业务（集群规模大，早期基于性能考虑没有全部替换）。</li>
-</ul>
-<h3 id="混合云部署方案"><a href="#混合云部署方案" class="headerlink" title="混合云部署方案"></a>混合云部署方案</h3><p>主要适合有专有云和自有机房的客户。可以在专有云和自由机房之间部署一个 OB 集群，或者 OB 主备集群。 OB 本质是一个软件，可以部署在物理机、ECS上，只要网络通并且延时和带宽满足要求即可。<br>使用主备集群方案时，可以将备集群放到云上 或者 线下，实现云上和云下的容灾。</p>
-<h3 id="多云部署方案"><a href="#多云部署方案" class="headerlink" title="多云部署方案"></a>多云部署方案</h3><p>主要适合在多个云厂商有 ECS 并自建数据库的客户。只要打通两边云厂商的 VPC 网络，横跨两个云厂商的ECS部署一个 OB 集群。建议5副本，实现跨云的多活能力。</p>
-<h2 id="OB-的容灾多活部署方案"><a href="#OB-的容灾多活部署方案" class="headerlink" title="OB 的容灾多活部署方案"></a>OB 的容灾多活部署方案</h2><p>OB 产品的特别之处就在于 OB 集群可以跨机房部署，甚至可以跨城市部署。根据实际需求不同也有多种玩法。</p>
-<h3 id="两地三中心三副本"><a href="#两地三中心三副本" class="headerlink" title="两地三中心三副本"></a>两地三中心三副本</h3><p><img src="/images/16276155163743.jpg"></p>
-<p>架构说明：</p>
-<ul>
-<li>同城双机房的机器都提供服务，双机房的之间的延时决定了实例的事务提交性能。</li>
-<li>当两个城市不是那么远的时候（杭州和上海网络延时 5~ 7ms左右），对于普通的业务，使用三副本就够了。即使有机器故障，业务实例的延时增加也在业务容忍范围内就行。</li>
-<li>如果两个城市的延时水平不满足业务性能要求，那就将副本数增加到5副本。副本越多，抵抗风险能力越强。</li>
-</ul>
-<h3 id="两地三中心五副本"><a href="#两地三中心五副本" class="headerlink" title="两地三中心五副本"></a>两地三中心五副本</h3><p><img src="/images/16276376363680.jpg"></p>
-<p>架构说明：</p>
-<ul>
-<li>总体三个机房：上海两个机房，北京一个机房。 这是某国有大行的理财业务（OB）的机房和OB部署示意图。</li>
-<li>上海每个机房里准备两个ZONE，上海两个机房之间是光纤专线，带宽和延时不是问题。双机房的4个ZONE 同时提供服务，这个能力空间很大。</li>
-<li>北京机房会有一个 ZONE5，跟上海两机房的四个 ZONE 合起来就是 OB 主集群。上海和北京机房的延时和带宽需要评估，不用像同城双机房之间那么高，但也不能太低。</li>
-<li>OB 主集群对每个具体的数据分区，可以抵抗最多两台机器同时故障带来的风险。如果有三台机器故障，局部实例不可用。这个时候就考虑切换到北京机房的 OB 备集群。</li>
-<li>OB 备集群是近期 OB 新增的能力，跟 ZONE5 部署一同部署在北京机房。OB 备集群可以是单副本，也可以是三副本，看灾备要求定。也可以先是单副本，后期启用后，在线扩容到三副本（只要机器准备好即可）。OB 集群的每个 ZONE 内机器数量可以跟主集群的ZONE 内机器数量不一致，但是相差不要太大。OB 主备集群同步能力见下面双机房主板容灾方案说明。再次说明，OB 的部署很灵活。</li>
-<li>水平拆分方案选择用了 OB 的分区表技术。同一个表的不同分区打散到多个机房多台机器。</li>
-<li>这个架构图满足工行数据库容灾等级最高要求。</li>
-</ul>
-<h3 id="双机房主备容灾方案"><a href="#双机房主备容灾方案" class="headerlink" title="双机房主备容灾方案"></a>双机房主备容灾方案</h3><p>凡事使用 Paxos 或者 Raft 技术的产品，都要求副本数是奇数（偶数副本数没有意义），在机房容灾部署的时候都会要求有三个可用区。但是传统客户，尤其是金融客户，都是同城两机房，异地可能还有个机房，只是那个机房很可能延时大带宽太小，规格不够。实际能用的就是同城双机房。</p>
-<p>目前 OB对双机房的部署方案就回归到传统 ORACLE 的 Dataguard 方案。</p>
-<p><img src="/images/16276236183782.jpg"></p>
-<p>架构说明：</p>
-<ul>
-<li>双机房，主机房部署 OB 主集群，备机房部署 OB 备集群。备集群可以是单副本，也可以是三副本，取决于容灾要求。</li>
-<li>OB 主备集群是两个集群，同步类似 ORACLE 的Dataguard 方案同步，通常是最大性能同步，也支持最大保护（强同步）和最大可用（在最大保护和最大性能之间取平衡）。按 ORACLE 的项目经验，绝大部分客户都用最大性能。推测 OB 的客户也多是如此。</li>
-<li>目前 OB 主备集群同步是整个集群里所有实例都同步。未来可能会变化按实例配置同步。</li>
-<li>OB 主备集群的切换支持正常的切换（<code>switchover</code>）和故障切换（<code>failover</code>）。在最大性能同步的时候，故障切换是不能保证不丢数据（<code>RPO&gt;=0</code>)。这个跟传统ORACLE DG的能力是一致。</li>
-</ul>
-<p>OB 主备集群双机房方案跟传统主备方案的能力和特点一样。缺点也是一样的，就是备集群默认不提供服务，备机房也没有利用上，有点浪费。不过 OB 的备集群也是可以提供只读服务，这也是 OB 读写分离的一种使用方法，分离的更彻底。</p>
-<p>如果想利用备机房，OB 的部署架构图还可以调整为下面这种：</p>
-<p><img src="/images/16276236270582.jpg"></p>
-<p>架构说明：</p>
-<ul>
-<li>双机房，OB 主集群的部分 Zone （少数派，3副本中的1个副本，5副本中的2个副本）放在机房 2。OB 的多活能力是 OB 所有的机器都有同时写入能力。</li>
-<li>不过，实例事务提交性能取决于多数派副本的事务日志同步能力和日志写能力。机房 2 的性能会比机房 1 的性能会慢一些（具体慢多少取决于双机房之间的网络延时和带宽）。此外，可能还会有分布式事务。</li>
-<li>有些业务是能接受这种性能，那么就可以将主副本打散到双机房。上图是 实例 1 和实例 2 在机房 1 和 2 同时提供读写服务。实例3 不接受这种性能损失，那就不在备机房提供读写服务。</li>
-<li>这个方案的特点是实现了双活，同时也解决了 OB主集群多数派故障时的可用性问题（故障切换到备集群）。备集群图中是单副本，启用后需要更高可用性的话，也可以在线扩容到三副本（前提是有机器）。</li>
-</ul>
-<h3 id="单元化部署方案"><a href="#单元化部署方案" class="headerlink" title="单元化部署方案"></a>单元化部署方案</h3><p>单元化是多活能力的最高标准，指的是从业务到数据库的链路都发生在某个机房。<br>要实现单元化，必须在应用层面对数据水平拆分，即分库分表（为什么？这个说来话长，这里不细说请看参考资料）。具体是 1 库 1 表或者 1 库多表，看业务特点。也不是所有的业务都能水平拆分。下面仅看能做水平拆分的业务数据的单元化部署架构。</p>
-<p><img src="/images/16276296569936.jpg"></p>
-<p>架构说明：</p>
-<ul>
-<li>应用在杭州和上海每个机房都部署，数据库是1套（真实业务是多套）OB集群横跨 5 个机房部署。</li>
-<li>实例 1-5 对应的是同一份业务数据，业务数据按用户ID（UID）拆分为5个实例（这里只是<strong>示意图</strong>，蚂蚁内部拆分为百库百表，远不止5个实例，比这个图粒度更细）。</li>
-<li>候选主副本指的如果某个ZONE的主副本故障了，会优先切换到同城另外一个机房的备副本上，这样业务层都可以不用切换流量。</li>
-<li>单元化架构的关键就是应用请求之间也带有UID信息，应用的流量转发也有水平拆分规则。应用流量的水平拆分规则跟数据库的水平拆分规则保持一致并联动。</li>
-<li>在单元化里，OB 的价值就是在数据库层面解决了数据多机房的强同步和高可用能力。RPO=0，RTO~30s。</li>
-</ul>
-<p><img src="/images/16276310905281.jpg"></p>
-<p>以上是蚂蚁和网商两地三中心五副本单元化的示意架构图，这套架构使用了 SOFA + OB 的多个产品。SOFA &amp; OB 最佳实践已经在多个外部客户落地。</p>
-<p>蚂蚁做单元化用了至少5个机房，外部客户不一定有这么多机房。4个机房的也可以玩。下面是某国有大行的银行核心业务之一的近似单元化架构。</p>
-<p><img src="/images/16276563498506.jpg"></p>
-<p>架构说明：</p>
-<ul>
-<li>总共有两个城市四个机房，每个城市有两个机房，机房之间光纤专线，延时和带宽都不是问题。</li>
-<li>业务数据水平拆分为南北两个集群（实例），每个集群的数据没有进一步水平拆分，而是直接用一个实例，在实例内部用 OB 的水平拆分技术（分区表技术）。同一个表的不同分区打散到多个机房多台机器。</li>
-<li>异地机房也做了一个三副本的 OB 备集群。整体容灾能力为最高水平。</li>
-<li>OB 的价值：提供跨机房跨城市的数据多副本同步技术（指高可用和强一致）；提供对业务完全透明的原生的水平拆分技术（指分区表技术，详情请看参考资料）。</li>
-</ul>
-<h2 id="后记"><a href="#后记" class="headerlink" title="后记"></a>后记</h2><p>总结一下，不管 OB 是那种部署方案，在一个集群内部，只要故障节点是少数派节点，OB都能提供极致的高可用能力（RPO=0,RTO<del>30s）。OB集群的各种部署架构和性能测试都是把数据安全放到第一位，没有异步同步或半同步等技术。针对 OB 主备集群，需要认识到主备集群同步跟传统数据库主备同步原理是一样的，不一定能保证故障切换不丢数据（RPO&gt;=0），并且故障切换也是需要手动做的（RTO</del>分钟级别）。</p>
-<p>OB 的部署方案都说到了吗？</p>
-<p>还没有，OB 3.2 版本将会推出计算存储分离架构，届时可以针对计算和存储能力分开配置服务器数目，上面部署形态又可以进一步变化。。。</p>
-]]></content>
-      <categories>
-        <category>运维</category>
-      </categories>
-      <tags>
-        <tag>OCEANBASE</tag>
-        <tag>运维</tag>
-        <tag>架构</tag>
       </tags>
   </entry>
 </search>
