@@ -22,12 +22,12 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"obpilot.github.io","root":"/","images":"/images","scheme":"Pisces","version":"8.7.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"}}</script><script src="/js/config.js"></script>
-<meta name="description" content="本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。 标准部署形态首先来一个 OB 最基础的最中规中矩的部署架构图。  &lt;– more –&gt;这个图信息量很大，下面一一说明。 部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环境">
+<meta name="description" content="本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。 标准部署形态首先来一个 OB 最基础的最中规中矩的部署架构图。  &lt;– more –&gt; 这个图信息量很大，下面一一说明。 部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环">
 <meta property="og:type" content="article">
 <meta property="og:title" content="OceanBase 部署架构实践总结">
 <meta property="og:url" content="http://obpilot.github.io/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/index.html">
 <meta property="og:site_name" content="Hexo">
-<meta property="og:description" content="本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。 标准部署形态首先来一个 OB 最基础的最中规中矩的部署架构图。  &lt;– more –&gt;这个图信息量很大，下面一一说明。 部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环境">
+<meta property="og:description" content="本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。 标准部署形态首先来一个 OB 最基础的最中规中矩的部署架构图。  &lt;– more –&gt; 这个图信息量很大，下面一一说明。 部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环">
 <meta property="og:locale" content="en_US">
 <meta property="og:image" content="http://obpilot.github.io/images/16275469181084.jpg">
 <meta property="og:image" content="http://obpilot.github.io/images/16275509356582.jpg">
@@ -50,7 +50,7 @@
 <meta property="og:image" content="http://obpilot.github.io/images/16276310905281.jpg">
 <meta property="og:image" content="http://obpilot.github.io/images/16276563498506.jpg">
 <meta property="article:published_time" content="2021-08-30T10:29:38.000Z">
-<meta property="article:modified_time" content="2021-08-30T10:38:41.393Z">
+<meta property="article:modified_time" content="2021-08-30T12:27:03.546Z">
 <meta property="article:author" content="obpilot">
 <meta property="article:tag" content="OCEANBASE">
 <meta property="article:tag" content="运维">
@@ -254,7 +254,7 @@
       <span class="post-meta-item-text">Posted on</span>
       
 
-      <time title="Created: 2021-08-30 18:29:38 / Modified: 18:38:41" itemprop="dateCreated datePublished" datetime="2021-08-30T18:29:38+08:00">2021-08-30</time>
+      <time title="Created: 2021-08-30 18:29:38 / Modified: 20:27:03" itemprop="dateCreated datePublished" datetime="2021-08-30T18:29:38+08:00">2021-08-30</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -301,7 +301,8 @@
         <p>本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。</p>
 <h2 id="标准部署形态"><a href="#标准部署形态" class="headerlink" title="标准部署形态"></a>标准部署形态</h2><p>首先来一个 OB 最基础的最中规中矩的部署架构图。</p>
 <p><img src="/images/16275469181084.jpg"></p>
-<p>&lt;– more –&gt;<br>这个图信息量很大，下面一一说明。</p>
+<p>&lt;– more –&gt;</p>
+<p>这个图信息量很大，下面一一说明。</p>
 <p>部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环境标准化。</p>
 <h3 id="部署环境标准化"><a href="#部署环境标准化" class="headerlink" title="部署环境标准化"></a>部署环境标准化</h3><p>不同客户的机器配置也不尽相同，OB 会对软硬件提一些基本要求。然后提供一个工具对机器进行自动初始化。主要是 OS 内核和会话参数的设置、文件系统的划分、用户和相关目录的创建。<br>早期的时候需要命令行下每个机器挨个执行。<br>现在提供了一个 OAT 产品（有图形界面），挨个添加机器，点点鼠标，自动初始化环境。现在一次初始化十几台机器也不是问题。</p>
 <p>OAT 怎么部署？<br>OAT 为了适应各种客户环境，选择了 docker 技术，只要启动一个 docker 容器就可以用。</p>
