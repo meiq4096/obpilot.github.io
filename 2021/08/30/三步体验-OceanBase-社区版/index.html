@@ -21,7 +21,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.3/css/all.min.css" integrity="sha256-2H3fkXt6FEmrReK448mDVGKb3WW2ZZw35gI7vqHOE4Y=" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
 
-<script class="next-config" data-name="main" type="application/json">{"hostname":"obpilot.github.io","root":"/","images":"/images","scheme":"Muse","version":"8.7.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":false,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"}}</script><script src="/js/config.js"></script>
+<script class="next-config" data-name="main" type="application/json">{"hostname":"obpilot.github.io","root":"/","images":"/images","scheme":"Pisces","version":"8.7.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":false,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"}}</script><script src="/js/config.js"></script>
 <meta name="description" content="简介本文是个人基于 OceanBase 社区版构建了一个容器镜像，仅用于学习研究。只要你有一个 4C10G的笔记本可以联网，你就可以在5分钟内将 OceanBase 社区版跑起来。 前提条件请确保宿主机的可用资源满足下面要求：  逻辑 CPU 不少于4个 可用内存不少于 10G，并且 docker 容器内存限制不少于10G 空间不少于10G  安装笔记本需要安装 Docker，并且在 Docker">
 <meta property="og:type" content="article">
 <meta property="og:title" content="三步体验 OceanBase 社区版">
@@ -32,8 +32,10 @@
 <meta property="og:image" content="http://obpilot.github.io/images/16301420583501.jpg">
 <meta property="og:image" content="http://obpilot.github.io/images/16296964112262.jpg">
 <meta property="article:published_time" content="2021-08-30T02:43:19.000Z">
-<meta property="article:modified_time" content="2021-08-30T02:47:08.678Z">
-<meta property="article:tag" content="oceanbase">
+<meta property="article:modified_time" content="2021-08-30T08:34:04.895Z">
+<meta property="article:tag" content="OCEANBASE">
+<meta property="article:tag" content="OCEANBASE-CE">
+<meta property="article:tag" content="DOCKER">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:image" content="http://obpilot.github.io/images/16301420583501.jpg">
 
@@ -144,13 +146,18 @@
   <nav class="site-state">
       <div class="site-state-item site-state-posts">
         <a href="/archives/">
-          <span class="site-state-item-count">2</span>
+          <span class="site-state-item-count">3</span>
           <span class="site-state-item-name">posts</span>
         </a>
       </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">2</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
       <div class="site-state-item site-state-tags">
           <a href="/tags/">
-        <span class="site-state-item-count">1</span>
+        <span class="site-state-item-count">5</span>
         <span class="site-state-item-name">tags</span></a>
       </div>
   </nav>
@@ -215,7 +222,16 @@
       <span class="post-meta-item-text">Posted on</span>
       
 
-      <time title="Created: 2021-08-30 10:43:19 / Modified: 10:47:08" itemprop="dateCreated datePublished" datetime="2021-08-30T10:43:19+08:00">2021-08-30</time>
+      <time title="Created: 2021-08-30 10:43:19 / Modified: 16:34:04" itemprop="dateCreated datePublished" datetime="2021-08-30T10:43:19+08:00">2021-08-30</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">In</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/%E8%BF%90%E7%BB%B4/" itemprop="url" rel="index"><span itemprop="name">运维</span></a>
+        </span>
     </span>
 
   
@@ -289,6 +305,11 @@
     
 
     <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/OCEANBASE/" rel="tag"># OCEANBASE</a>
+              <a href="/tags/OCEANBASE-CE/" rel="tag"># OCEANBASE-CE</a>
+              <a href="/tags/DOCKER/" rel="tag"># DOCKER</a>
+          </div>
 
         
 
@@ -299,6 +320,9 @@
                 </a>
             </div>
             <div class="post-nav-item">
+                <a href="/2021/08/30/DB2-%E8%BF%81%E7%A7%BB-OceanBase-%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/" rel="next" title="DB2 迁移 OceanBase 实践总结">
+                  DB2 迁移 OceanBase 实践总结 <i class="fa fa-chevron-right"></i>
+                </a>
             </div>
           </div>
     </footer>
@@ -330,16 +354,16 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-chart-line"></i>
     </span>
-    <span title="Symbols count total">9k</span>
+    <span title="Symbols count total">39k</span>
   </span>
   <span class="post-meta-item">
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="Reading time total">8 mins.</span>
+    <span title="Reading time total">35 mins.</span>
   </span>
 </div>
-  <div class="powered-by">Powered by <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/muse/" rel="noopener" target="_blank">NexT.Muse</a>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a>
   </div>
 
     </div>
@@ -347,7 +371,7 @@
 
   
   <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
-<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/schemes/muse.js"></script><script src="/js/next-boot.js"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script>
 
   
 

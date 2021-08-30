@@ -22,25 +22,31 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
 
 <script class="next-config" data-name="main" type="application/json">{"hostname":"obpilot.github.io","root":"/","images":"/images","scheme":"Pisces","version":"8.7.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":18,"offset":12},"copycode":false,"bookmark":{"enable":false,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"}}</script><script src="/js/config.js"></script>
-<meta name="description" content="obpilot home">
-<meta property="og:type" content="website">
-<meta property="og:title" content="Hexo">
-<meta property="og:url" content="http://obpilot.github.io/index.html">
+<meta name="description" content="IBM DB2 是美国IBM公司开发的一套关系型数据库管理系统，它主要的运行环境为UNIX（包括IBM自家的AIX）、Linux、IBM i（旧称OS&#x2F;400）、z&#x2F;OS，以及Windows服务器版本。其中 LINUX、UNIX 和Windows 平台又简称 LUW 开放平台。客户包含 省农信、农商行 以及一些中字头金融机构。 目前业界应该没有哪家国产数据库号称兼容 DB2， 所以 “去 DB2”">
+<meta property="og:type" content="article">
+<meta property="og:title" content="DB2 迁移 OceanBase 实践总结">
+<meta property="og:url" content="http://obpilot.github.io/2021/08/30/DB2-%E8%BF%81%E7%A7%BB-OceanBase-%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/index.html">
 <meta property="og:site_name" content="Hexo">
-<meta property="og:description" content="obpilot home">
+<meta property="og:description" content="IBM DB2 是美国IBM公司开发的一套关系型数据库管理系统，它主要的运行环境为UNIX（包括IBM自家的AIX）、Linux、IBM i（旧称OS&#x2F;400）、z&#x2F;OS，以及Windows服务器版本。其中 LINUX、UNIX 和Windows 平台又简称 LUW 开放平台。客户包含 省农信、农商行 以及一些中字头金融机构。 目前业界应该没有哪家国产数据库号称兼容 DB2， 所以 “去 DB2”">
 <meta property="og:locale" content="en_US">
-<meta property="article:tag" content="oceanbase">
+<meta property="og:image" content="http://obpilot.github.io/images/16289205000178.jpg">
+<meta property="og:image" content="http://obpilot.github.io/images/16289206656037.jpg">
+<meta property="article:published_time" content="2021-08-30T08:32:43.000Z">
+<meta property="article:modified_time" content="2021-08-30T08:35:19.620Z">
+<meta property="article:tag" content="DB2">
+<meta property="article:tag" content="OCEANBASE">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://obpilot.github.io/images/16289205000178.jpg">
 
 
-<link rel="canonical" href="http://obpilot.github.io/">
+<link rel="canonical" href="http://obpilot.github.io/2021/08/30/DB2-%E8%BF%81%E7%A7%BB-OceanBase-%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/">
 
 
 
-<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":true,"isPost":false,"lang":"en","comments":"","permalink":"","path":"index.html","title":""}</script>
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"en","comments":true,"permalink":"http://obpilot.github.io/2021/08/30/DB2-%E8%BF%81%E7%A7%BB-OceanBase-%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/","path":"2021/08/30/DB2-迁移-OceanBase-实践总结/","title":"DB2 迁移 OceanBase 实践总结"}</script>
 
 <script class="next-config" data-name="calendar" type="application/json">""</script>
-<title>Hexo</title>
+<title>DB2 迁移 OceanBase 实践总结 | Hexo</title>
   
 
 
@@ -112,7 +118,7 @@
 
   <aside class="sidebar">
 
-    <div class="sidebar-inner sidebar-overview-active">
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
       <ul class="sidebar-nav">
         <li class="sidebar-nav-toc">
           Table of Contents
@@ -125,6 +131,7 @@
       <div class="sidebar-panel-container">
         <!--noindex-->
         <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E8%A1%A8%E7%BB%93%E6%9E%84%E8%BD%AC%E6%8D%A2"><span class="nav-number">1.</span> <span class="nav-text">表结构转换</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%87%AA%E5%A2%9E%E5%88%97%E7%B1%BB%E5%9E%8B"><span class="nav-number">1.1.</span> <span class="nav-text">自增列类型</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DB2-%E7%9A%84-DATE-TIME-%E8%B7%9F-OB-ORACLE-%E7%9A%84-DATE-%E5%B7%AE%E5%BC%82%E9%97%AE%E9%A2%98"><span class="nav-number">1.2.</span> <span class="nav-text">DB2 的 DATE &#x2F; TIME 跟 OB(ORACLE) 的 DATE 差异问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%97%E7%AC%A6%E9%9B%86%E9%97%AE%E9%A2%98"><span class="nav-number">1.3.</span> <span class="nav-text">字符集问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AD%97%E7%AC%A6%E4%B8%B2%E9%95%BF%E5%BA%A6%E9%97%AE%E9%A2%98"><span class="nav-number">1.4.</span> <span class="nav-text">字符串长度问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%9D%9E%E7%A9%BA%E4%B8%8E%E7%A9%BA%E5%80%BC%E9%97%AE%E9%A2%98"><span class="nav-number">1.5.</span> <span class="nav-text">非空与空值问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%8C%83%E5%9B%B4%E5%88%86%E5%8C%BA%E8%A1%A8%E5%88%86%E5%8C%BA%E8%BE%B9%E7%95%8C%E9%97%AE%E9%A2%98"><span class="nav-number">1.6.</span> <span class="nav-text">范围分区表分区边界问题</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#SQL-%E8%AF%AD%E6%B3%95%E8%BD%AC%E6%8D%A2"><span class="nav-number">2.</span> <span class="nav-text">SQL 语法转换</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#rownumber-%E5%87%BD%E6%95%B0"><span class="nav-number">2.1.</span> <span class="nav-text">rownumber 函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#FETCH-FIRST-N-ROWS"><span class="nav-number">2.2.</span> <span class="nav-text">FETCH FIRST N ROWS</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%97%E5%90%8D%E9%87%8D%E5%A4%8D%E9%97%AE%E9%A2%98"><span class="nav-number">2.3.</span> <span class="nav-text">列名重复问题</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%A1%A8%E5%88%AB%E5%90%8D%E9%97%AE%E9%A2%98"><span class="nav-number">2.4.</span> <span class="nav-text">表别名问题</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#DB2-%E7%9A%84-ORACLE-%E5%85%BC%E5%AE%B9%E6%A8%A1%E5%BC%8F"><span class="nav-number">3.</span> <span class="nav-text">DB2 的 ORACLE 兼容模式</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#DB2-%E5%92%8C-OB-ORACLE-%E7%9A%84%E5%BC%82%E6%9E%84%E6%95%B0%E6%8D%AE%E5%90%8C%E6%AD%A5"><span class="nav-number">4.</span> <span class="nav-text">DB2 和 OB(ORACLE) 的异构数据同步</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%85%B6%E4%BB%96%E5%8F%82%E8%80%83"><span class="nav-number">5.</span> <span class="nav-text">其他参考</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%99%84%E5%BD%95"><span class="nav-number">6.</span> <span class="nav-text">附录</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#DB2-DOCKER-%E7%8E%AF%E5%A2%83%E6%90%AD%E5%BB%BA"><span class="nav-number">6.1.</span> <span class="nav-text">DB2 DOCKER 环境搭建</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#DATAX-FOR-OB-%E5%90%8C%E6%AD%A5%E4%BB%BB%E5%8A%A1%E6%96%87%E4%BB%B6%E7%A4%BA%E4%BE%8B"><span class="nav-number">6.2.</span> <span class="nav-text">DATAX FOR OB 同步任务文件示例</span></a></li></ol></li></ol></div>
         </div>
         <!--/noindex-->
 
@@ -178,16 +185,17 @@
 </noscript>
 
 
-    <div class="main-inner index posts-expand">
+    <div class="main-inner post posts-expand">
 
-    
+
+  
 
 
 <div class="post-block">
   
   
 
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="en">
     <link itemprop="mainEntityOfPage" href="http://obpilot.github.io/2021/08/30/DB2-%E8%BF%81%E7%A7%BB-OceanBase-%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -200,9 +208,9 @@
       <meta itemprop="name" content="Hexo">
     </span>
       <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2021/08/30/DB2-%E8%BF%81%E7%A7%BB-OceanBase-%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/" class="post-title-link" itemprop="url">DB2 迁移 OceanBase 实践总结</a>
-        </h2>
+        <h1 class="post-title" itemprop="name headline">
+          DB2 迁移 OceanBase 实践总结
+        </h1>
 
         <div class="post-meta-container">
           <div class="post-meta">
@@ -250,7 +258,7 @@
     
     
     <div class="post-body" itemprop="articleBody">
-          <p>IBM DB2 是美国IBM公司开发的一套关系型数据库管理系统，它主要的运行环境为UNIX（包括IBM自家的AIX）、Linux、IBM i（旧称OS/400）、z/OS，以及Windows服务器版本。其中 LINUX、UNIX 和Windows 平台又简称 LUW 开放平台。客户包含 省农信、农商行 以及一些中字头金融机构。</p>
+        <p>IBM DB2 是美国IBM公司开发的一套关系型数据库管理系统，它主要的运行环境为UNIX（包括IBM自家的AIX）、Linux、IBM i（旧称OS/400）、z/OS，以及Windows服务器版本。其中 LINUX、UNIX 和Windows 平台又简称 LUW 开放平台。客户包含 省农信、农商行 以及一些中字头金融机构。</p>
 <p>目前业界应该没有哪家国产数据库号称兼容 DB2， 所以 “去 DB2” ，业务的改造是不可避免的。业界数据库能力最接近 DB2 的是 ORACLE 数据库，而 OceanBase 又同时兼容 ORACLE 和 MySQL。所以 DB2 迁移到 OceanBase ，最佳选择是选择 ORACLE 租户类型。个别客户为了去 DB2 后不再被数据库厂商标准绑定，会选择 OceanBase的 MySQL 租户。<br>本文主要是总结 DB2 迁移到 OceanBase ORACLE 租户的经验。</p>
 <p>首先要评估 DB2 的表结构在 OB(ORACLE) 上的兼容性。</p>
 <h2 id="表结构转换"><a href="#表结构转换" class="headerlink" title="表结构转换"></a>表结构转换</h2><p>DB2 跟 OB(ORACLE) 的数据类型差异还是比较大，下面仅就常用的类型的典型差异举例说明。</p>
@@ -429,7 +437,6 @@
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> /home/admin/datax3 &amp;&amp; bin/datax.py job/datax_test.json</span><br></pre></td></tr></table></figure>
 
 
-      
     </div>
 
     
@@ -437,229 +444,26 @@
     
 
     <footer class="post-footer">
-        <div class="post-eof"></div>
-      
+          <div class="post-tags">
+              <a href="/tags/DB2/" rel="tag"># DB2</a>
+              <a href="/tags/OCEANBASE/" rel="tag"># OCEANBASE</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/2021/08/30/%E4%B8%89%E6%AD%A5%E4%BD%93%E9%AA%8C-OceanBase-%E7%A4%BE%E5%8C%BA%E7%89%88/" rel="prev" title="三步体验 OceanBase 社区版">
+                  <i class="fa fa-chevron-left"></i> 三步体验 OceanBase 社区版
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
     </footer>
   </article>
 </div>
 
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://obpilot.github.io/2021/08/30/%E4%B8%89%E6%AD%A5%E4%BD%93%E9%AA%8C-OceanBase-%E7%A4%BE%E5%8C%BA%E7%89%88/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="">
-      <meta itemprop="description" content="obpilot home">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Hexo">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2021/08/30/%E4%B8%89%E6%AD%A5%E4%BD%93%E9%AA%8C-OceanBase-%E7%A4%BE%E5%8C%BA%E7%89%88/" class="post-title-link" itemprop="url">三步体验 OceanBase 社区版</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">Posted on</span>
-      
-
-      <time title="Created: 2021-08-30 10:43:19 / Modified: 16:34:04" itemprop="dateCreated datePublished" datetime="2021-08-30T10:43:19+08:00">2021-08-30</time>
-    </span>
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-folder"></i>
-      </span>
-      <span class="post-meta-item-text">In</span>
-        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
-          <a href="/categories/%E8%BF%90%E7%BB%B4/" itemprop="url" rel="index"><span itemprop="name">运维</span></a>
-        </span>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="Symbols count in article">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">Symbols count in article: </span>
-      <span>8.3k</span>
-    </span>
-    <span class="post-meta-item" title="Reading time">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">Reading time &asymp;</span>
-      <span>8 mins.</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <h2 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h2><p>本文是个人基于 OceanBase 社区版构建了一个容器镜像，仅用于学习研究。只要你有一个 4C10G的笔记本可以联网，你就可以在5分钟内将 OceanBase 社区版跑起来。</p>
-<h2 id="前提条件"><a href="#前提条件" class="headerlink" title="前提条件"></a>前提条件</h2><p>请确保宿主机的可用资源满足下面要求：</p>
-<ul>
-<li>逻辑 CPU 不少于4个</li>
-<li>可用内存不少于 10G，并且 docker 容器内存限制不少于10G</li>
-<li>空间不少于10G</li>
-</ul>
-<h2 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h2><p>笔记本需要安装 Docker，并且在 Docker 的设置里将容器使用的内存上限调整到 10 G 。下面是 Mac 版本的 Docker 容器设置。</p>
-<p><img src="/images/16301420583501.jpg"></p>
-<h3 id="下载镜像和启动容器"><a href="#下载镜像和启动容器" class="headerlink" title="下载镜像和启动容器"></a>下载镜像和启动容器</h3><p>下载镜像，文件大概 2.3G 不到。具体时间取决于连接 <code>https://hub.docker.com/repository/docker/obpilot/oceanbase-ce</code> 网站的网速。</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">docker pull obpilot/oceanbase-ce:latest</span><br><span class="line"></span><br><span class="line">docker images</span><br><span class="line">REPOSITORY                                            TAG                     IMAGE ID            CREATED             SIZE</span><br><span class="line">obpilot/oceanbase-ce                                  latest                  0017baaa9d87        23 minutes ago      2.24GB</span><br><span class="line"></span><br><span class="line">docker run -itd -m 10G --name oceanbase-ce  obpilot/oceanbase-ce:latest</span><br><span class="line"></span><br><span class="line">docker ps</span><br><span class="line">CONTAINER ID        IMAGE                         COMMAND                  CREATED             STATUS              PORTS                                                                     NAMES</span><br><span class="line">e5dd6da0aa8d        obpilot/oceanbase-ce:latest   <span class="string">&quot;/bin/bash&quot;</span>              40 minutes ago      Up 40 minutes                                                                                 oceanbase-ce</span><br></pre></td></tr></table></figure>
-
-<p>启动容器的时候，可选的是如果有独立盘目录 <code>/data</code>，可以加上 <code>-v /data:/data </code> 参数。</p>
-<h3 id="登录容器，启动-OB-集群"><a href="#登录容器，启动-OB-集群" class="headerlink" title="登录容器，启动 OB 集群"></a>登录容器，启动 OB 集群</h3><p>容器内已经部署了 OB 社区版自动化部署工具 OBD 。使用 OBD 启动集群，第一次会初始化集群，时间需要2-3分钟（取决于宿主机性能）。</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">docker <span class="built_in">exec</span> -it oceanbase-ce bash</span><br><span class="line"></span><br><span class="line">obd cluster list</span><br><span class="line"></span><br><span class="line">obd cluster start obdemo</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>下面是启动输出。</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line">[admin@e5dd6da0aa8d ~]$ obd cluster list</span><br><span class="line">+------------------------------------------------------------+</span><br><span class="line">|                        Cluster List                        |</span><br><span class="line">+--------+---------------------------------+-----------------+</span><br><span class="line">| Name   | Configuration Path              | Status (Cached) |</span><br><span class="line">+--------+---------------------------------+-----------------+</span><br><span class="line">| obdemo | /home/admin/.obd/cluster/obdemo | deployed        |</span><br><span class="line">+--------+---------------------------------+-----------------+</span><br><span class="line">[admin@e5dd6da0aa8d ~]$ obd cluster start obdemo</span><br><span class="line">Get <span class="built_in">local</span> repositories and plugins ok</span><br><span class="line">Open ssh connection ok</span><br><span class="line">Cluster param config check ok</span><br><span class="line">Check before start observer ok</span><br><span class="line">Check before start obproxy ok</span><br><span class="line">Start observer ok</span><br><span class="line">observer program health check ok</span><br><span class="line">Connect to observer ok</span><br><span class="line">Initialize cluster</span><br><span class="line">Cluster bootstrap ok</span><br><span class="line">Wait <span class="keyword">for</span> observer init ok</span><br><span class="line">+---------------------------------------------+</span><br><span class="line">|                   observer                  |</span><br><span class="line">+-----------+---------+------+-------+--------+</span><br><span class="line">| ip        | version | port | zone  | status |</span><br><span class="line">+-----------+---------+------+-------+--------+</span><br><span class="line">| 127.0.0.1 | 3.1.0   | 2881 | zone1 | active |</span><br><span class="line">+-----------+---------+------+-------+--------+</span><br><span class="line"></span><br><span class="line">Start obproxy ok</span><br><span class="line">obproxy program health check ok</span><br><span class="line">Connect to obproxy ok</span><br><span class="line">Initialize cluster</span><br><span class="line">+---------------------------------------------+</span><br><span class="line">|                   obproxy                   |</span><br><span class="line">+-----------+------+-----------------+--------+</span><br><span class="line">| ip        | port | prometheus_port | status |</span><br><span class="line">+-----------+------+-----------------+--------+</span><br><span class="line">| 127.0.0.1 | 2883 | 2884            | active |</span><br><span class="line">+-----------+------+-----------------+--------+</span><br><span class="line">obdemo running</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>admin 用户的密码是 : <code>adminPWD123</code> . 您可以使用 sudo yum 安装软件包。</p>
-<h3 id="创建-OB-实例（租户）"><a href="#创建-OB-实例（租户）" class="headerlink" title="创建 OB 实例（租户）"></a>创建 OB 实例（租户）</h3><p>默认初始化的 OB 集群还没有创建业务实例。需要手动建一个。</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">obclient -h127.1 -uroot@sys<span class="comment">#obdemo -P2883 -prootPWD123 -c -A oceanbase</span></span><br><span class="line"></span><br><span class="line">alter resource unit sys_unit_config min_cpu=5;</span><br><span class="line">-- 创建资源单元规格</span><br><span class="line">CREATE resource unit S4C1G max_cpu=4, min_cpu=4, max_memory=<span class="string">&#x27;1G&#x27;</span>, min_memory=<span class="string">&#x27;1G&#x27;</span>, max_iops=10000, min_iops=1000, max_session_num=1000000, max_disk_size=<span class="string">&#x27;1024G&#x27;</span>; </span><br><span class="line"></span><br><span class="line">-- 创建资源池（分配资源）</span><br><span class="line">CREATE resource pool my_pool unit = <span class="string">&#x27;S4C1G&#x27;</span>, unit_num = 1;</span><br><span class="line"></span><br><span class="line">-- 创建实例（mysql类型）</span><br><span class="line">create tenant obmysql resource_pool_list=(<span class="string">&#x27;my_pool&#x27;</span>), primary_zone=<span class="string">&#x27;RANDOM&#x27;</span>,comment <span class="string">&#x27;mysql tenant/instance&#x27;</span>, charset=<span class="string">&#x27;utf8&#x27;</span> <span class="built_in">set</span> ob_tcp_invited_nodes=<span class="string">&#x27;%&#x27;</span>, ob_compatibility_mode=<span class="string">&#x27;mysql&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="built_in">exit</span>;</span><br></pre></td></tr></table></figure>
-
-<h3 id="登录使用-OB-实例"><a href="#登录使用-OB-实例" class="headerlink" title="登录使用 OB 实例"></a>登录使用 OB 实例</h3><p>默认创建的 OB 实例，连接密码是空。 登录后可以导入 bmsql.sql 中的建库建表语句。</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">obclient -h 127.1 -uroot@obmysql<span class="comment">#obdemo -P2883 -p -c -A test</span></span><br><span class="line"></span><br><span class="line">empty password.</span><br><span class="line"></span><br><span class="line">show databases;</span><br><span class="line"></span><br><span class="line"><span class="built_in">source</span> bmsql.sql</span><br></pre></td></tr></table></figure>
-
-<p>成功后，输出</p>
-<figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line">MySQL [tpccdb]<span class="operator">&gt;</span> <span class="keyword">show</span> tables;</span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+</span></span><br><span class="line"><span class="operator">|</span> Tables_in_tpccdb <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+</span></span><br><span class="line"><span class="operator">|</span> bmsql_config     <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_customer   <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_district   <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_history    <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_item       <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_new_order  <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_oorder     <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_order_line <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_stock      <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> bmsql_warehouse  <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">------------------+</span></span><br><span class="line"><span class="number">10</span> <span class="keyword">rows</span> <span class="keyword">in</span> <span class="keyword">set</span> (<span class="number">0.003</span> sec)</span><br><span class="line"></span><br><span class="line">MySQL [tpccdb]<span class="operator">&gt;</span> <span class="keyword">show</span> tablegroups;</span><br><span class="line"><span class="operator">+</span><span class="comment">-----------------+------------------+---------------+</span></span><br><span class="line"><span class="operator">|</span> Tablegroup_name <span class="operator">|</span> Table_name       <span class="operator">|</span> Database_name <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">-----------------+------------------+---------------+</span></span><br><span class="line"><span class="operator">|</span> oceanbase       <span class="operator">|</span> <span class="keyword">NULL</span>             <span class="operator">|</span> <span class="keyword">NULL</span>          <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_customer   <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_district   <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_history    <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_new_order  <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_oorder     <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_order_line <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_stock      <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> tpcc_group      <span class="operator">|</span> bmsql_warehouse  <span class="operator">|</span> tpccdb        <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">-----------------+------------------+---------------+</span></span><br><span class="line"><span class="number">9</span> <span class="keyword">rows</span> <span class="keyword">in</span> <span class="keyword">set</span> (<span class="number">0.008</span> sec)</span><br></pre></td></tr></table></figure>
-
-<h2 id="附录1：Docker-镜像制作方法"><a href="#附录1：Docker-镜像制作方法" class="headerlink" title="附录1：Docker 镜像制作方法"></a>附录1：Docker 镜像制作方法</h2><p>第一次使用 Dockerfile 构建镜像，还不是很娴熟，功能做的比较粗糙。下面是 Dockerfile</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">cat Dockerfile</span><br><span class="line"></span><br><span class="line">FROM centos:latest</span><br><span class="line">MAINTAINER obpilot</span><br><span class="line">COPY ./obdemo.yaml /tmp/</span><br><span class="line"></span><br><span class="line">VOLUME [<span class="string">&quot;/data&quot;</span>]</span><br><span class="line"></span><br><span class="line">RUN yum -y install tree net-tools vim sudo passwd \</span><br><span class="line">	&amp;&amp; yum -y install mariadb-connector-c \</span><br><span class="line">	&amp;&amp; yum install -y yum-utils \</span><br><span class="line">	&amp;&amp; yum-config-manager --add-repo https://mirrors.aliyun.com/oceanbase/OceanBase.repo \</span><br><span class="line">	&amp;&amp; yum install -y ob-deploy obclient \</span><br><span class="line">	&amp;&amp; useradd admin &amp;&amp; <span class="built_in">echo</span> <span class="string">&#x27;admin:adminPWD123&#x27;</span> | chpasswd \</span><br><span class="line">	&amp;&amp; sed -i <span class="string">&#x27;$a\admin    ALL=(ALL)	ALL&#x27;</span> /etc/sudoers \</span><br><span class="line">	&amp;&amp; mkdir -p /data/1 /data/log1  \</span><br><span class="line">	&amp;&amp; chown -R admin.admin /data/ /tmp/ \</span><br><span class="line">	&amp;&amp; su admin -c  <span class="string">&quot;obd cluster deploy obdemo -c /tmp/obdemo.yaml&quot;</span></span><br><span class="line"></span><br><span class="line">USER admin</span><br><span class="line">WORKDIR /home/admin</span><br><span class="line">COPY ./bmsql.sql /home/admin/</span><br><span class="line">COPY ./readme.md /home/admin/</span><br></pre></td></tr></table></figure>
-
-<h2 id="附录2-OBD-集群初始化配置文件"><a href="#附录2-OBD-集群初始化配置文件" class="headerlink" title="附录2: OBD 集群初始化配置文件"></a>附录2: OBD 集群初始化配置文件</h2><p>OBD 是 OB 社区版推出的自动化部署工具，现在功能也越来越成熟好用了。开源网站（<code>https://github.com/oceanbase/obdeploy/tree/master/example</code>）提供了几个配置模板文件。这里是修改后的配置文件。部署的是单机版 OB，监听本地 IP。</p>
-<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">## Only need to configure when remote login is required</span></span><br><span class="line"><span class="comment"># user:</span></span><br><span class="line"><span class="comment">#   username: your username</span></span><br><span class="line"><span class="comment">#   password: your password if need</span></span><br><span class="line"><span class="comment">#   key_file: your ssh-key file path if need</span></span><br><span class="line"><span class="comment">#   port: your ssh port, default 22</span></span><br><span class="line"><span class="comment">#   timeout: ssh connection timeout (second), default 30</span></span><br><span class="line"><span class="attr">oceanbase-ce:</span></span><br><span class="line">  <span class="attr">servers:</span></span><br><span class="line">    <span class="comment"># Please don&#x27;t use hostname, only IP can be supported</span></span><br><span class="line">    <span class="bullet">-</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span></span><br><span class="line">  <span class="attr">global:</span></span><br><span class="line">    <span class="comment">#  The working directory for OceanBase Database. OceanBase Database is started under this directory. This is a required field.</span></span><br><span class="line">    <span class="attr">home_path:</span> <span class="string">/home/admin/oceanbase-ce</span></span><br><span class="line">    <span class="comment"># The directory for data storage. The default value is $home_path/store.</span></span><br><span class="line">    <span class="comment"># data_dir: /data/1</span></span><br><span class="line">    <span class="comment"># The directory for clog, ilog, and slog. The default value is the same as the data_dir value.</span></span><br><span class="line">    <span class="attr">redo_dir:</span> <span class="string">/data/log1</span></span><br><span class="line">    <span class="comment"># Please set devname as the network adaptor&#x27;s name whose ip is  in the setting of severs.</span></span><br><span class="line">    <span class="comment"># if set severs as &quot;127.0.0.1&quot;, please set devname as &quot;lo&quot;</span></span><br><span class="line">    <span class="comment"># if current ip is 192.168.1.10, and the ip&#x27;s network adaptor&#x27;s name is &quot;eth0&quot;, please use &quot;eth0&quot;</span></span><br><span class="line">    <span class="attr">devname:</span> <span class="string">lo</span></span><br><span class="line">    <span class="attr">mysql_port:</span> <span class="number">2881</span> <span class="comment"># External port for OceanBase Database. The default value is 2881.</span></span><br><span class="line">    <span class="attr">rpc_port:</span> <span class="number">2882</span> <span class="comment"># Internal port for OceanBase Database. The default value is 2882.</span></span><br><span class="line">    <span class="attr">zone:</span> <span class="string">zone1</span></span><br><span class="line">    <span class="attr">cluster_id:</span> <span class="number">1</span></span><br><span class="line">    <span class="comment"># please set memory limit to a suitable value which is matching resource.</span></span><br><span class="line">    <span class="attr">memory_limit:</span> <span class="string">8G</span> <span class="comment"># The maximum running memory for an observer</span></span><br><span class="line">    <span class="attr">system_memory:</span> <span class="string">4G</span> <span class="comment"># The reserved system memory. system_memory is reserved for general tenants. The default value is 30G.</span></span><br><span class="line">    <span class="attr">stack_size:</span> <span class="string">512K</span></span><br><span class="line">    <span class="attr">cpu_count:</span> <span class="number">16</span></span><br><span class="line">    <span class="attr">cache_wash_threshold:</span> <span class="string">1G</span></span><br><span class="line">    <span class="attr">__min_full_resource_pool_memory:</span> <span class="number">268435456</span></span><br><span class="line">    <span class="attr">workers_per_cpu_quota:</span> <span class="number">10</span></span><br><span class="line">    <span class="attr">schema_history_expire_time:</span> <span class="string">1d</span></span><br><span class="line">    <span class="comment"># The value of net_thread_count had better be same as cpu&#x27;s core number.</span></span><br><span class="line">    <span class="attr">net_thread_count:</span> <span class="number">4</span></span><br><span class="line">    <span class="attr">major_freeze_duty_time:</span> <span class="string">Disable</span></span><br><span class="line">    <span class="attr">minor_freeze_times:</span> <span class="number">10</span></span><br><span class="line">    <span class="attr">enable_separate_sys_clog:</span> <span class="number">0</span></span><br><span class="line">    <span class="attr">enable_merge_by_turn:</span> <span class="literal">FALSE</span></span><br><span class="line">    <span class="comment">#datafile_disk_percentage: 20 # The percentage of the data_dir space to the total disk space. This value takes effect only when datafile_size is 0. The default value is 90.</span></span><br><span class="line">    <span class="attr">datafile_size:</span> <span class="string">5G</span></span><br><span class="line">    <span class="attr">syslog_level:</span> <span class="string">ERROR</span> <span class="comment"># System log level. The default value is INFO.</span></span><br><span class="line">    <span class="attr">enable_syslog_wf:</span> <span class="literal">false</span> <span class="comment"># Print system logs whose levels are higher than WARNING to a separate log file. The default value is true.</span></span><br><span class="line">    <span class="attr">enable_syslog_recycle:</span> <span class="literal">true</span> <span class="comment"># Enable auto system log recycling or not. The default value is false.</span></span><br><span class="line">    <span class="attr">max_syslog_file_count:</span> <span class="number">4</span> <span class="comment"># The maximum number of reserved log files before enabling auto recycling. The default value is 0.</span></span><br><span class="line">    <span class="comment"># observer cluster name, consistent with obproxy&#x27;s cluster_name</span></span><br><span class="line">    <span class="attr">appname:</span> <span class="string">obdemo</span></span><br><span class="line">    <span class="attr">root_password:</span> <span class="string">rootPWD123</span> <span class="comment"># root user password, can be empty</span></span><br><span class="line">    <span class="attr">proxyro_password:</span>  <span class="string">proxyROPWD123</span> <span class="comment"># proxyro user pasword, consistent with obproxy&#x27;s observer_sys_password, can be empty</span></span><br><span class="line"><span class="attr">obproxy:</span></span><br><span class="line">  <span class="attr">servers:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span></span><br><span class="line">  <span class="attr">global:</span></span><br><span class="line">    <span class="attr">listen_port:</span> <span class="number">2883</span> <span class="comment"># External port. The default value is 2883.</span></span><br><span class="line">    <span class="attr">prometheus_listen_port:</span> <span class="number">2884</span> <span class="comment"># The Prometheus port. The default value is 2884.</span></span><br><span class="line">    <span class="attr">home_path:</span> <span class="string">/home/admin/obproxy</span></span><br><span class="line">    <span class="comment"># oceanbase root server list</span></span><br><span class="line">    <span class="comment"># format: ip:mysql_port,ip:mysql_port</span></span><br><span class="line">    <span class="attr">rs_list:</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span><span class="string">:2881</span></span><br><span class="line">    <span class="attr">enable_cluster_checkout:</span> <span class="literal">false</span></span><br><span class="line">    <span class="comment"># observer cluster name, consistent with oceanbase-ce&#x27;s appname</span></span><br><span class="line">    <span class="attr">cluster_name:</span> <span class="string">obdemo</span></span><br><span class="line">    <span class="attr">obproxy_sys_password:</span>  <span class="string">proxySYSPWD123</span> <span class="comment"># obproxy sys user password, can be empty</span></span><br><span class="line">    <span class="attr">observer_sys_password:</span> <span class="string">proxyROPWD123</span> <span class="comment"># proxyro user pasword, consistent with oceanbase-ce&#x27;s proxyro_password, can be empty</span></span><br><span class="line">    <span class="attr">automatic_match_work_thread:</span> <span class="literal">false</span></span><br><span class="line">    <span class="attr">work_thread_num:</span> <span class="number">12</span></span><br><span class="line">    <span class="attr">xflush_log_level:</span> <span class="string">ERROR</span></span><br><span class="line">    <span class="attr">monitor_log_level:</span> <span class="string">ERROR</span></span><br><span class="line">    <span class="attr">syslog_level:</span> <span class="string">ERROR</span></span><br><span class="line">    <span class="attr">log_dir_size_threshold:</span> <span class="string">1G</span></span><br><span class="line">    <span class="attr">enable_compression_protocol:</span> <span class="literal">false</span></span><br></pre></td></tr></table></figure>
-
-<p>里面的 <code>datafile_size</code> 写的很小（<code>5G</code>）。如果你磁盘空间很大，可以后期对 OB集群里数据文件扩容。</p>
-<h2 id="其他参考"><a href="#其他参考" class="headerlink" title="其他参考"></a>其他参考</h2><p>有问题欢迎留言，或者登录 OB 社区版官网问答区（<code>https://open.oceanbase.com/answer</code>) ，或者 OB社区版钉钉群直接跟开发和其他用户沟通交流。</p>
-<p><img src="/images/16296964112262.jpg"></p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
-
-
-
-
-    
-
-
-<div class="post-block">
-  
-  
-
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="">
-    <link itemprop="mainEntityOfPage" href="http://obpilot.github.io/2021/08/30/hello-world/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="">
-      <meta itemprop="description" content="obpilot home">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Hexo">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          <a href="/2021/08/30/hello-world/" class="post-title-link" itemprop="url">Hello World</a>
-        </h2>
-
-        <div class="post-meta-container">
-          <div class="post-meta">
-    <span class="post-meta-item">
-      <span class="post-meta-item-icon">
-        <i class="far fa-calendar"></i>
-      </span>
-      <span class="post-meta-item-text">Posted on</span>
-      
-
-      <time title="Created: 2021-08-30 09:57:00 / Modified: 09:59:57" itemprop="dateCreated datePublished" datetime="2021-08-30T09:57:00+08:00">2021-08-30</time>
-    </span>
-
-  
-    <span class="post-meta-break"></span>
-    <span class="post-meta-item" title="Symbols count in article">
-      <span class="post-meta-item-icon">
-        <i class="far fa-file-word"></i>
-      </span>
-      <span class="post-meta-item-text">Symbols count in article: </span>
-      <span>367</span>
-    </span>
-    <span class="post-meta-item" title="Reading time">
-      <span class="post-meta-item-icon">
-        <i class="far fa-clock"></i>
-      </span>
-      <span class="post-meta-item-text">Reading time &asymp;</span>
-      <span>1 mins.</span>
-    </span>
-</div>
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-          <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-
-      
-    </div>
-
-    
-    
-    
-
-    <footer class="post-footer">
-        <div class="post-eof"></div>
-      
-    </footer>
-  </article>
-</div>
 
 
 
