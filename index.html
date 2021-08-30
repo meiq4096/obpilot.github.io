@@ -227,7 +227,7 @@
       <span class="post-meta-item-text">Posted on</span>
       
 
-      <time title="Created: 2021-08-30 18:29:38 / Modified: 20:27:03" itemprop="dateCreated datePublished" datetime="2021-08-30T18:29:38+08:00">2021-08-30</time>
+      <time title="Created: 2021-08-30 18:29:38 / Modified: 20:36:37" itemprop="dateCreated datePublished" datetime="2021-08-30T18:29:38+08:00">2021-08-30</time>
     </span>
     <span class="post-meta-item">
       <span class="post-meta-item-icon">
@@ -266,8 +266,8 @@
     <div class="post-body" itemprop="articleBody">
           <p>本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。</p>
 <h2 id="标准部署形态"><a href="#标准部署形态" class="headerlink" title="标准部署形态"></a>标准部署形态</h2><p>首先来一个 OB 最基础的最中规中矩的部署架构图。</p>
-<p><img src="/images/16275469181084.jpg"></p>
 <p>&lt;– more –&gt;</p>
+<p><img src="/images/16275469181084.jpg"></p>
 <p>这个图信息量很大，下面一一说明。</p>
 <p>部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环境标准化。</p>
 <h3 id="部署环境标准化"><a href="#部署环境标准化" class="headerlink" title="部署环境标准化"></a>部署环境标准化</h3><p>不同客户的机器配置也不尽相同，OB 会对软硬件提一些基本要求。然后提供一个工具对机器进行自动初始化。主要是 OS 内核和会话参数的设置、文件系统的划分、用户和相关目录的创建。<br>早期的时候需要命令行下每个机器挨个执行。<br>现在提供了一个 OAT 产品（有图形界面），挨个添加机器，点点鼠标，自动初始化环境。现在一次初始化十几台机器也不是问题。</p>
@@ -717,7 +717,7 @@
     <span class="post-meta-item-icon">
       <i class="fa fa-coffee"></i>
     </span>
-    <span title="Reading time total">1:08</span>
+    <span title="Reading time total">1:09</span>
   </span>
 </div>
 <div class="busuanzi-count">
