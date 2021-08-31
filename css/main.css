@@ -1736,9 +1736,6 @@ pre code {
 .back-to-top {
   font-size: 12px;
 }
-.back-to-top span {
-  display: none;
-}
 .back-to-top {
   margin: 8px -10px -20px;
   opacity: 0;
