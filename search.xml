@@ -4,9 +4,9 @@
     <title>OceanBase 部署架构实践总结</title>
     <url>/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/</url>
     <content><![CDATA[<p>本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。</p>
-<h2 id="标准部署形态"><a href="#标准部署形态" class="headerlink" title="标准部署形态"></a>标准部署形态</h2><p>首先来一个 OB 最基础的最中规中矩的部署架构图。</p>
 <span id="more"></span>
 
+<h2 id="标准部署形态"><a href="#标准部署形态" class="headerlink" title="标准部署形态"></a>标准部署形态</h2><p>首先来一个 OB 最基础的最中规中矩的部署架构图。</p>
 <p><img src="/images/16275469181084.jpg"></p>
 <p>这个图信息量很大，下面一一说明。</p>
 <p>部署一个产品，最大的挑战就是用户环境。100 个用户，可能就有 100 种环境。产品应付不过来，要求部署环境要标准。所以，部署的第一步就是环境标准化。</p>
@@ -198,7 +198,8 @@
   <entry>
     <title>Hello World</title>
     <url>/2021/08/30/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.<br>&lt;– more –&gt;</p>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
+<span id="more"></span>
 <h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
 
 <p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
@@ -277,9 +278,9 @@
     <url>/2021/08/30/DB2-%E8%BF%81%E7%A7%BB-OceanBase-%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/</url>
     <content><![CDATA[<p>IBM DB2 是美国IBM公司开发的一套关系型数据库管理系统，它主要的运行环境为UNIX（包括IBM自家的AIX）、Linux、IBM i（旧称OS/400）、z/OS，以及Windows服务器版本。其中 LINUX、UNIX 和Windows 平台又简称 LUW 开放平台。客户包含 省农信、农商行 以及一些中字头金融机构。</p>
 <p>目前业界应该没有哪家国产数据库号称兼容 DB2， 所以 “去 DB2” ，业务的改造是不可避免的。业界数据库能力最接近 DB2 的是 ORACLE 数据库，而 OceanBase 又同时兼容 ORACLE 和 MySQL。所以 DB2 迁移到 OceanBase ，最佳选择是选择 ORACLE 租户类型。个别客户为了去 DB2 后不再被数据库厂商标准绑定，会选择 OceanBase的 MySQL 租户。<br>本文主要是总结 DB2 迁移到 OceanBase ORACLE 租户的经验。</p>
-<p>首先要评估 DB2 的表结构在 OB(ORACLE) 上的兼容性。</p>
 <span id="more"></span>
 
+<p>首先要评估 DB2 的表结构在 OB(ORACLE) 上的兼容性。</p>
 <h2 id="表结构转换"><a href="#表结构转换" class="headerlink" title="表结构转换"></a>表结构转换</h2><p>DB2 跟 OB(ORACLE) 的数据类型差异还是比较大，下面仅就常用的类型的典型差异举例说明。</p>
 <h3 id="自增列类型"><a href="#自增列类型" class="headerlink" title="自增列类型"></a>自增列类型</h3><p>DB2 的 SQL 语法，在 OB(ORACLE) 里都可以找到对应的实现，但不完全一样。<br>DB2 的自增列（<code>IDENTITY</code>）语法 OB 3.2 版本开始支持。在那之前，需要应用使用 SEQUENCE 给列填充值。</p>
 <ul>
@@ -660,6 +661,252 @@
       <tags>
         <tag>OCEANBASE</tag>
         <tag>DATAX</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>mysqldump 重搭备库方法</title>
+    <url>/2021/08/31/mysqldump-%E9%87%8D%E6%90%AD%E5%A4%87%E5%BA%93%E6%96%B9%E6%B3%95/</url>
+    <content><![CDATA[<p>本文简单总结如何使用 mysqldump 命令搭建备库。这只是搭建备库的一种方法，另外一种方法是使用 <code>xtrabackup</code> 物理备份恢复。</p>
+<span id="more"></span>
+
+<h2 id="当前主库信息"><a href="#当前主库信息" class="headerlink" title="当前主库信息"></a>当前主库信息</h2><p>以下命令在主库和备库上运行。检查主备环境。要求主备环境一致，如果有不一致，可能影响后面结果。请自行判断。</p>
+<ul>
+<li>是否用了GTID？</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">show</span> <span class="keyword">global</span> variables <span class="keyword">where</span> variable_name <span class="keyword">in</span> (<span class="string">&#x27;gtid_mode&#x27;</span>,<span class="string">&#x27;gtid_executed&#x27;</span>,<span class="string">&#x27;gtid_purged&#x27;</span>);</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>如果 <code>gtid_mode</code>的值为ON，则表示使用了GTID；否则，没有开启。<br>根据是否有GTID，选择不同的备库重搭方案。</p>
+<ul>
+<li>写日志参数 </li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">show</span> <span class="keyword">global</span> variables <span class="keyword">where</span> variable_name <span class="keyword">in</span> (<span class="string">&#x27;sync_binlog&#x27;</span>,<span class="string">&#x27;innodb_flush_log_at_trx_commit&#x27;</span>);</span><br><span class="line"><span class="operator">+</span><span class="comment">--------------------------------+-------+</span></span><br><span class="line"><span class="operator">|</span> Variable_name                  <span class="operator">|</span> <span class="keyword">Value</span> <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">--------------------------------+-------+</span></span><br><span class="line"><span class="operator">|</span> innodb_flush_log_at_trx_commit <span class="operator">|</span> <span class="number">1</span>     <span class="operator">|</span></span><br><span class="line"><span class="operator">|</span> sync_binlog                    <span class="operator">|</span> <span class="number">1000</span>  <span class="operator">|</span></span><br><span class="line"><span class="operator">+</span><span class="comment">--------------------------------+-------+</span></span><br></pre></td></tr></table></figure>
+
+<p>2 rows in set (0.00 sec)</p>
+<p>记录当前值。</p>
+<ul>
+<li>判断当前mysql环境</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ps -ef|grep mysqld</span><br></pre></td></tr></table></figure>
+<p>看mysqld使用的是哪个目录的mysql</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">which</span> mysql</span><br><span class="line"><span class="built_in">which</span> mysqldump</span><br></pre></td></tr></table></figure>
+<p>看mysql和mysqldump的运行环境，如果跟mysqld不一致，那么使用mysql的完整的目录。防止客户环境有多套mysql环境，互相干扰。</p>
+<h2 id="有GTID时搭建方法"><a href="#有GTID时搭建方法" class="headerlink" title="有GTID时搭建方法"></a>有GTID时搭建方法</h2><h3 id="备份主库"><a href="#备份主库" class="headerlink" title="备份主库"></a>备份主库</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">/u01/mysql/bin/mysqldump --all-databases --single-transaction --set-gtid-purged=ON --triggers --routines --host=127.0.0.1 --port=3306 --user=root  --password=<span class="string">&#x27;密码&#x27;</span> &gt; dbpaas-metadb.sql </span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p><strong>注：</strong> </p>
+<ol>
+<li><code>set-gtid-purged</code>值必须为ON，这样导出的sql里会设置<code>GTID_PURGED</code>值，用于自动搭建同步。</li>
+</ol>
+<h3 id="将备份文件传送到备库"><a href="#将备份文件传送到备库" class="headerlink" title="将备份文件传送到备库"></a>将备份文件传送到备库</h3><p>如果文件很大，压缩；否则，用nc直传。</p>
+<ul>
+<li>源端（主库）：</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line">nc -l 8086 &lt; dbpaas-metadb.sql </span><br></pre></td></tr></table></figure>
+
+<p>+目标端（备库）：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">nc 主库IP 8086 &gt; dbpaas-metadb.sql</span><br></pre></td></tr></table></figure>
+
+<h3 id="备库开始导入备份sql"><a href="#备库开始导入备份sql" class="headerlink" title="备库开始导入备份sql"></a>备库开始导入备份sql</h3><ul>
+<li>备库导入备份sql之前的准备</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">reset master;</span><br><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> sync_binlog<span class="operator">=</span><span class="number">0</span>;</span><br><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> innodb_flush_log_at_trx_commit<span class="operator">=</span><span class="number">0</span>;</span><br></pre></td></tr></table></figure>
+
+<p><strong>注：</strong> </p>
+<ol>
+<li>reset master 是为了重置备库的binlog，让主库上的slave复制自动失败，以避免备库导入的sql到主库上再被同步一次。</li>
+<li>修改刷日志参数，是为了提升导入性能。根据导入文件大小，导入时间长短不一，耐心等待。</li>
+</ol>
+<ul>
+<li>备库开始导入备份sql</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysql -h127.1 -uroot -P3306 -p &lt; dbpaas-metadb.sql </span><br><span class="line">输入密码</span><br></pre></td></tr></table></figure>
+
+
+<h3 id="备库同步启动"><a href="#备库同步启动" class="headerlink" title="备库同步启动"></a>备库同步启动</h3><ul>
+<li>备库启动同步</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">stop slave;</span><br><span class="line">reset slave;</span><br><span class="line">CHANGE MASTER <span class="keyword">TO</span> MASTER_AUTO_POSITION<span class="operator">=</span><span class="number">1</span>;</span><br><span class="line"><span class="keyword">start</span> slave;</span><br><span class="line"><span class="keyword">show</span> slave status\G</span><br></pre></td></tr></table></figure>
+
+<p><strong>注：</strong></p>
+<ol>
+<li>查看slave同步状态，如果报错，根据报错情况处理。这里之所以没有指定<code>MASTER_USER</code>和<code>MASTER_PASSWORD</code>，是因为该slave此前已经设置过了，保存在内存里。如果是无法连接主库，则使用完整的change 语句。如下。</li>
+</ol>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="comment">---备用sql，正常不用执行</span></span><br><span class="line">reset slave;</span><br><span class="line">stop slave;</span><br><span class="line">CHANGE MASTER <span class="keyword">TO</span> MASTER_HOST<span class="operator">=</span><span class="string">&#x27;11.164.191.36&#x27;</span>,MASTER_PORT<span class="operator">=</span><span class="number">3306</span>, MASTER_USER<span class="operator">=</span><span class="string">&#x27;复制帐号&#x27;</span>,MASTER_PASSWORD<span class="operator">=</span><span class="string">&#x27;复制帐号密码&#x27;</span>, MASTER_AUTO_POSITION<span class="operator">=</span><span class="number">1</span>;</span><br><span class="line"><span class="keyword">start</span> slave;</span><br><span class="line"><span class="keyword">show</span> slave status\G</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>等待同步赶上。</li>
+</ul>
+<p>如正常继续。耐心等待同步赶上</p>
+<ul>
+<li>修改刷日志参数</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> sync_binlog<span class="operator">=</span><span class="number">1</span>;</span><br><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> innodb_flush_log_at_trx_commit<span class="operator">=</span><span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+
+<p><strong>注：</strong></p>
+<ol>
+<li>日志参数必须改回双1，否则异常宕机时，会导致日志有部分丢失，同步会中断。</li>
+</ol>
+<ul>
+<li>查看备库的Binlog信息</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">show</span> master status;</span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">251825466</span> <span class="operator">|</span>              <span class="operator">|</span>                  <span class="operator">|</span>                   <span class="operator">|</span></span><br></pre></td></tr></table></figure>
+
+<p>该信息用于下面修复主库的同步。</p>
+<h3 id="修复主库的同步"><a href="#修复主库的同步" class="headerlink" title="修复主库的同步"></a>修复主库的同步</h3><ul>
+<li>重新设置主库的复制位点。</li>
+</ul>
+<p>``sql<br>–源端（主库）<br>stop slave;<br>reset slave;<br>CHANGE MASTER TO MASTER_LOG_FILE=’mysql-bin.000001’, MASTER_LOG_POS=251825466;<br>start slave;<br>show slave status\G</p>
+<figure class="highlight routeros"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">## 无GTID时搭建方法</span></span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">### 备份主库</span></span><br><span class="line"></span><br><span class="line">```bash</span><br><span class="line">mysqldump --all-databases --single-transaction <span class="attribute">--master-data</span>=2 --triggers --routines <span class="attribute">--host</span>=127.0.0.1 <span class="attribute">--port</span>=3306 <span class="attribute">--user</span>=root  <span class="attribute">--password</span>=<span class="string">&#x27;密码&#x27;</span> &gt; dbpaas-metadb.sql </span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p><strong>注：</strong> </p>
+<ol>
+<li>master-data=2，导出文件头部会有 CHANGE MASTER语句。</li>
+<li>备份期间，主库不能有DDL操作，否则，会彼此阻塞。</li>
+<li>备份期间，另开窗口，查看主库会话，看是否有‘锁阻塞’事件发生。 show processlist;</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment">#head -n 50 dbpaas-metadb.sql |grep &quot;CHANGE MASTER&quot;</span></span><br><span class="line">-- CHANGE MASTER TO MASTER_LOG_FILE=<span class="string">&#x27;mysql-bin.000019&#x27;</span>, MASTER_LOG_POS=146425128;</span><br></pre></td></tr></table></figure>
+
+<p>这个CHANGE MASTER 语句取出来，留作后用。</p>
+<h3 id="将备份文件传送到备库-1"><a href="#将备份文件传送到备库-1" class="headerlink" title="将备份文件传送到备库"></a>将备份文件传送到备库</h3><p>如果文件很大，压缩；否则，用nc直传。</p>
+<ul>
+<li>源端（主库）：</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line">nc -l 8086 &lt; dbpaas-metadb.sql </span><br></pre></td></tr></table></figure>
+
+<p>+目标端（备库）：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">nc 主库IP 8086 &gt; dbpaas-metadb.sql</span><br></pre></td></tr></table></figure>
+
+<h3 id="备库开始导入备份sql-1"><a href="#备库开始导入备份sql-1" class="headerlink" title="备库开始导入备份sql"></a>备库开始导入备份sql</h3><ul>
+<li>备库导入备份sql之前的准备</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">reset master;</span><br><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> sync_binlog<span class="operator">=</span><span class="number">0</span>;</span><br><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> innodb_flush_log_at_trx_commit<span class="operator">=</span><span class="number">0</span>;</span><br></pre></td></tr></table></figure>
+
+<p><strong>注：</strong> </p>
+<ol>
+<li>reset master 是为了重置备库的binlog，让主库上的slave复制自动失败，以避免备库导入的sql到主库上再被同步一次。</li>
+<li>修改刷日志参数，是为了提升导入性能。根据导入文件大小，导入时间长短不一，耐心等待。</li>
+</ol>
+<ul>
+<li>备库开始导入备份sql</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">mysql -h127.1 -uroot -P3306 -p &lt; dbpaas-metadb.sql </span><br><span class="line">输入密码</span><br></pre></td></tr></table></figure>
+
+<h3 id="备库开始修复同步"><a href="#备库开始修复同步" class="headerlink" title="备库开始修复同步"></a>备库开始修复同步</h3><p>前面从备份sql里取出了CHANGE MASTER语句，用在这里。</p>
+<ul>
+<li>重新设置同步位点。</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">stop slave;</span><br><span class="line">reset slave;</span><br><span class="line">CHANGE MASTER <span class="keyword">TO</span> MASTER_LOG_FILE<span class="operator">=</span><span class="string">&#x27;mysql-bin.000019&#x27;</span>, MASTER_LOG_POS<span class="operator">=</span><span class="number">146425128</span>;</span><br><span class="line"><span class="keyword">start</span> slave;</span><br><span class="line"><span class="keyword">show</span> slave status\G</span><br></pre></td></tr></table></figure>
+
+<p><strong>注：</strong></p>
+<ol>
+<li>上面的<code>MASTER_LOG_FILE</code>和<code>MASTER_LOG_POS</code>的值，以实际为准。</li>
+<li>查看slave同步状态，如果报错，根据报错情况处理。这里之所以没有指定<code>MASTER_USER</code>和<code>MASTER_PASSWORD</code>，是因为该slave此前已经设置过了，保存在内存里。如果是无法连接主库，则使用完整的change 语句。如下。</li>
+</ol>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="comment">---备用sql，正常不用执行</span></span><br><span class="line">reset slave;</span><br><span class="line">stop slave;</span><br><span class="line">CHANGE MASTER <span class="keyword">TO</span> MASTER_HOST<span class="operator">=</span><span class="string">&#x27;11.164.191.36&#x27;</span>,MASTER_PORT<span class="operator">=</span><span class="number">3306</span>, MASTER_USER<span class="operator">=</span><span class="string">&#x27;复制帐号&#x27;</span>,MASTER_PASSWORD<span class="operator">=</span><span class="string">&#x27;复制帐号密码&#x27;</span>, MASTER_LOG_FILE<span class="operator">=</span><span class="string">&#x27;mysql-bin.000009&#x27;</span>, MASTER_LOG_POS<span class="operator">=</span><span class="number">394974494</span>;</span><br><span class="line"><span class="keyword">start</span> slave;</span><br><span class="line"><span class="keyword">show</span> slave status\G</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>等待同步赶上。</li>
+</ul>
+<p>如正常继续。耐心等待同步赶上</p>
+<ul>
+<li>修改刷日志参数</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> sync_binlog<span class="operator">=</span><span class="number">1</span>;</span><br><span class="line"><span class="keyword">set</span> <span class="keyword">global</span> innodb_flush_log_at_trx_commit<span class="operator">=</span><span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+
+<p><strong>注：</strong></p>
+<ol>
+<li>日志参数必须改回双1，否则异常宕机时，会导致日志有部分丢失，同步会中断。</li>
+</ol>
+<ul>
+<li>查看备库的Binlog信息</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">show</span> master status;</span><br><span class="line"><span class="operator">|</span> mysql<span class="operator">-</span>bin<span class="number">.000001</span> <span class="operator">|</span> <span class="number">251825466</span> <span class="operator">|</span>              <span class="operator">|</span>                  <span class="operator">|</span>                   <span class="operator">|</span></span><br></pre></td></tr></table></figure>
+
+<p>该信息用于下面修复主库的同步。</p>
+<h3 id="修复主库的同步-1"><a href="#修复主库的同步-1" class="headerlink" title="修复主库的同步"></a>修复主库的同步</h3><ul>
+<li>重新设置主库的复制位点。</li>
+</ul>
+<p>``sql<br>–源端（主库）<br>stop slave;<br>reset slave;<br>CHANGE MASTER TO MASTER_LOG_FILE=’mysql-bin.000001’, MASTER_LOG_POS=251825466;<br>start slave;<br>show slave status\G</p>
+<pre><code>
+
+</code></pre>
+]]></content>
+      <categories>
+        <category>运维</category>
+      </categories>
+      <tags>
+        <tag>MYSQL</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>OB 开源团队招聘需求</title>
+    <url>/2021/08/31/OB-%E5%BC%80%E6%BA%90%E5%9B%A2%E9%98%9F%E6%8B%9B%E8%81%98%E9%9C%80%E6%B1%82/</url>
+    <content><![CDATA[<h2 id="OceanBase-简介"><a href="#OceanBase-简介" class="headerlink" title="OceanBase 简介"></a>OceanBase 简介</h2><p>OceanBase 是阿里巴巴和蚂蚁金服完全自主研发的通用的<strong>分布式关系型数据库</strong>，从2010年第一版本研发上线，至今已有11年。版本也从 0.3 发展到 3.2。</p>
+<span id="more"></span>
+
+<p>OceanBase 从 2020年6月1日起，从支付宝内独立出来为全资子公司，公司业务主要是面向国内外分布式关系型数据库市场。目前客户主要分布是大型金融机构（银行、保险、证券等）、运营商、国企等。OceanBase 的目标是全行业，场景特点是 OLTP + ROLAP 业务。</p>
+<p>OceanBase 在 2021年6月1日，再次开源。目前开源团队组建中，急需 DBA布道师、开发者运营人员、数据库工具开发者、内核开发者（C/C++)。</p>
+<p>欢迎感兴趣的朋友自荐或推荐。OceanBase 跟其他开源数据库的显著区别之一是 OceanBase 先有企业版和企业客户案例，然后才有开源版本，并面向中小企业和个人用户。</p>
+<h2 id="OceanBase-资源"><a href="#OceanBase-资源" class="headerlink" title="OceanBase 资源"></a>OceanBase 资源</h2><ul>
+<li>OB 官网： <code>open.oceanbase.com</code></li>
+<li>OB 开源地址：<code>github.com/oceanbase</code></li>
+<li>OB 官方威信公众号：<code>OceanBase</code></li>
+<li>OB 开源钉钉群：钉钉搜索：<code>33254054</code> 。</li>
+<li>OB 开源微信群：请先微信加我（<code>obpilot4096</code>），然后拉您进群。</li>
+<li>简历投递方式：可以在职位外网链接直接投递，或者联系我微信（<code>obpilot4096</code>），或者邮件（<code>qing.meiq#alibaba-inc.com</code>)(请改<code>#</code>为<code>@</code>)</li>
+</ul>
+<h2 id="OceanBase-开源团队岗位"><a href="#OceanBase-开源团队岗位" class="headerlink" title="OceanBase 开源团队岗位"></a>OceanBase 开源团队岗位</h2><p>下面职位要求供参考。关键点是：热爱数据库技术、热爱分享、乐于沟通。有些技术要求可以适当放宽。欢迎联系我。</p>
+<h3 id="蚂蚁集团-OceanBase开源布道师-上海-北京-杭州-深圳"><a href="#蚂蚁集团-OceanBase开源布道师-上海-北京-杭州-深圳" class="headerlink" title="蚂蚁集团-OceanBase开源布道师-上海/北京/杭州/深圳"></a>蚂蚁集团-OceanBase开源布道师-上海/北京/杭州/深圳</h3><ul>
+<li>职位地址：<code>https://talent.alibaba.com/off-campus-position/736002?trace=qrcode_share</code></li>
+<li>基础信息：工作地点（北京/上海/杭州/深圳）、工作年限（3年以上）、有DBA经历、热爱分享</li>
+<li>职位描述：</li>
+</ul>
+<figure class="highlight"><table><tr><td class="code"><pre><span class="line">1、重点负责OceanBase 开源社区技术布道工作，通过技术分享、内容和活动等形式，提升社区影响力，构建开发者和用户生态；</span><br><span class="line">2、参与 OceanBase 开源项目的技术方案规划，参与开源社区治理，开源技术生态运营，推动开源生态合作伙伴的合作；</span><br><span class="line">3、制定开源技术、社区整体运营规划，为社区发展及各项指标负责；</span><br><span class="line">4、协调外部公司或内部合作团队，落实项目的阶段性结果并实现最终目标。</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>职位要求：</li>
+</ul>
+<figure class="highlight mipsasm"><table><tr><td class="code"><pre><span class="line"><span class="number">1</span>.熟练掌握MySQL、<span class="keyword">Oracle等一种主流数据库体系架构及运行机制，了解主流的分布式数据库（Spanner/Cassandra等），对各数据库优劣和适用场景有深入的理解，能根据具体场景进行数据库选型和模型设计. </span>多年DBA经验者优先；</span><br><span class="line"><span class="number">2</span>.熟练掌握ACID、范式设计、索引设计等关系数据库基础理论知识，熟悉<span class="number">2</span>pc、paxos、<span class="keyword">base、cap等分布式数据库基础理论知识. </span>曾任数据库内核研发或测试或产品经理优先.；</span><br><span class="line"><span class="number">3</span>.大学本科及以上学历，熟悉开源文化及社区运作模式，对开源有热情，在开源相关领域有一定的行业影响力优先.；</span><br><span class="line"><span class="number">4</span>.具备良好的学习能力，积极进取的心态，文字写作能力，以及演讲沟通能力，英语水平满足工作交流。</span><br></pre></td></tr></table></figure>
+
+<h3 id="蚂蚁集团-OceanBase开源开发者运营-杭州"><a href="#蚂蚁集团-OceanBase开源开发者运营-杭州" class="headerlink" title="蚂蚁集团-OceanBase开源开发者运营-杭州"></a>蚂蚁集团-OceanBase开源开发者运营-杭州</h3><ul>
+<li>职位地址：<code>https://talent.alibaba.com/off-campus-position/694827?trace=qrcode_share</code></li>
+<li>基础信息：工作地点（北京/杭州）、工作年限（2年以上）、学历（本科以上）</li>
+<li>职位描述：</li>
+</ul>
+<figure class="highlight markdown"><table><tr><td class="code"><pre><span class="line"><span class="bullet">1.</span> 规划和产出 OceanBase 的技术内容体系，让优质内容得以被体系化呈现；</span><br><span class="line"><span class="bullet">2.</span> OceanBase 的技术传播体系的构建和运营，并完成技术内容的传播，为传播效果负责；</span><br><span class="line"><span class="bullet">3.</span> OceanBase 开发者社群运营，围绕开发者设计有参与感的社群活动，并拿到业务结果；</span><br><span class="line"><span class="bullet">4.</span> 根据团队情况和技术热点，策划技术传播的热点事件。</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>职位要求：</li>
+</ul>
+<figure class="highlight markdown"><table><tr><td class="code"><pre><span class="line"><span class="bullet">1.</span> 对技术有一定的理解， 能与技术团队高效合作，并能与开发者共情；</span><br><span class="line"><span class="bullet">2.</span> 对短视频等新兴内容形式有“网感”，能创意的组织内容结构；</span><br><span class="line"><span class="bullet">3.</span> 乐观、思维活跃，学习能力强，能快速吸收新的玩法；</span><br><span class="line"><span class="bullet">4.</span> 抗压能力强，有主人翁意识，有破局韧性；</span><br><span class="line"><span class="bullet">5.</span> 有较好的英文表达、书写能力。</span><br></pre></td></tr></table></figure>
+
+<h3 id="蚂蚁集团-OceanBase开源生态工具研发-java-go-python-北京-杭州-上海-深圳"><a href="#蚂蚁集团-OceanBase开源生态工具研发-java-go-python-北京-杭州-上海-深圳" class="headerlink" title="蚂蚁集团-OceanBase开源生态工具研发 java/go/python-北京/杭州/上海/深圳"></a>蚂蚁集团-OceanBase开源生态工具研发 java/go/python-北京/杭州/上海/深圳</h3><ul>
+<li>职位地址：<code>https://talent.alibaba.com/off-campus-position/705161?trace=qrcode_share</code></li>
+<li>基础信息：工作地点（北京/上海/杭州/深圳）、工作年限（2年以上）、学历（本科以上）</li>
+<li>职位描述：</li>
+</ul>
+<figure class="highlight awk"><table><tr><td class="code"><pre><span class="line">参与开源生态的研发</span><br><span class="line"></span><br><span class="line"><span class="number">1</span>. 负责数据库同步系统的研发, 底层使用类似于流计算框架来支撑数据库之间的集数据迁移、订阅及实时同步功能于一体. 可参考 `https:<span class="regexp">//</span>www.oceanbase.com<span class="regexp">/product/</span>oms` 。</span><br><span class="line"><span class="number">2</span>. 负责数据库备份工具, 可以为OceanBase提供强有力的保护，包括本地数据中心、其他云厂商、公共云及混合云。</span><br><span class="line"><span class="number">3</span>. 负责数据库运维管控平台, 实现OceanBase管控平台的研发, 管理和部署OceanBse, 接入k8s, `https:<span class="regexp">//</span>www.oceanbase.com<span class="regexp">/product/</span>ocp`</span><br><span class="line"><span class="number">4</span>. 负责数据库诊断工具的研发, 帮助快速定位OceanBase 问题, 尤其是对OceanBase监控系统。</span><br><span class="line"><span class="number">5</span>. 负责数据库客户端驱动, 实现类似go 驱动, 对接navicate, kettle, hue 等工具。</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>职位要求：</li>
+</ul>
+<figure class="highlight awk"><table><tr><td class="code"><pre><span class="line"><span class="number">1</span>.熟练掌握ACID、范式设计、索引设计等关系数据库基础理论知识，熟悉<span class="number">2</span>pc、paxos、base、cap等分布式数据库基础理论知识。</span><br><span class="line"><span class="number">2</span>.熟练掌握MySQL、Oracle等一种主流数据库体系架构及运行机制，了解主流的分布式数据库（Spanner/Cassandra等），对各数据库优劣和适用场景有深入的理解，能根据具体场景进行数据库选型和模型设计。</span><br><span class="line"><span class="number">3</span>.熟悉Linux<span class="regexp">/Unix操作系统，熟练掌握C++/</span>Java<span class="regexp">/Python/</span>Perl/Golang等语言中的一种，可以通过编写程序解决工作中遇到的问题，具备良好的编程风格，有高并发系统经验者优先。</span><br><span class="line"><span class="number">4</span>.熟练掌握数据库性能优化技巧，能够定位全链路上的性能瓶颈（网络、CPU、IO、操作系统等），并解决问题。</span><br><span class="line"><span class="number">5</span>.对技术特别是存储技术方面有激情有追求，愿意在数据库领域持续投入青春和精力，渴望突破、勇于挑战。</span><br><span class="line"><span class="number">6</span>.良好的团队协作能力，有大局观，有较强的抗压能力和积极的心态。</span><br><span class="line"><span class="number">7</span>.良好的沟通表达能力，具备优秀的文档能力，使用文字、图示清楚地表达架构意图，能够熟练编写各类技术文档。</span><br><span class="line"><span class="number">8</span>.具有 Hadoop<span class="regexp">/spark/</span>Flink<span class="regexp">/storm/</span>elastic search<span class="regexp">/Kafka等分布式计算系统开发/</span>运维经验者优。</span><br></pre></td></tr></table></figure>
+
+<h3 id="蚂蚁集团-OceanBase开源内核研发-杭州-北京-上海-深圳"><a href="#蚂蚁集团-OceanBase开源内核研发-杭州-北京-上海-深圳" class="headerlink" title="蚂蚁集团-OceanBase开源内核研发-杭州/北京/上海/深圳"></a>蚂蚁集团-OceanBase开源内核研发-杭州/北京/上海/深圳</h3><ul>
+<li>职位地址：<code>https://talent.alibaba.com/off-campus-position/705161?trace=qrcode_share</code></li>
+<li>基础信息：工作地点（北京/上海/杭州/深圳）、工作年限（2年以上）、学历（本科以上）</li>
+<li>职位描述：</li>
+</ul>
+<figure class="highlight markdown"><table><tr><td class="code"><pre><span class="line"><span class="bullet">1.</span> 参与 OceanBase数据库内核模块研发, 参与OceanBase SQL模块的研发工作， 或者分布式数据库OceanBase内核存储引擎研发 。</span><br><span class="line"><span class="bullet">2.</span> SQL 引擎则打造全面支持HTAP场景的新一代SQL引擎，包括但不限于查询优化、向量化执行引擎、分布式执行。</span><br><span class="line"><span class="bullet">3.</span> MySQL/Oracle 兼容性等方面的开发工作与性能调优, 存储引擎则重点解决性能优化, 尤其是单机性能优化, 新索引技术, 抽象存储介质层, 存储引擎接口层封装等任务的开发和研究。</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li>职位要求：</li>
+</ul>
+<figure class="highlight markdown"><table><tr><td class="code"><pre><span class="line"><span class="bullet">1.</span> 至少熟悉Java/C++/Python/Go语言的一种或多种，有不错的编程实战能力和调试能力。</span><br><span class="line"><span class="bullet">2.</span> 熟练掌握多线程等高并发系统编程和优化技能；熟悉分布式系统的设计和应用，熟悉分布式、缓存、消息等机制；能对分布式常用技术进行合理应用，解决问题。</span><br><span class="line"><span class="bullet">3.</span> 加分项：有SQL执行引擎、优化器、分布式执行引擎等相关项目经验者优先。</span><br><span class="line"><span class="bullet">4.</span> 加分项：有数据库研发内核经验者优先。</span><br><span class="line"><span class="bullet">5.</span> 加分项: 有大型分布式系统内核研发经验者优先。</span><br><span class="line"><span class="bullet">6.</span> 加分项: 有dba 经验或数据库运维经验 者优先。</span><br><span class="line"><span class="bullet">7.</span> 加分项: 有云计算平台研发经验者优先。</span><br><span class="line"><span class="bullet">8.</span> 快速学习能力，较强的团队沟通和协作能力，较强的自我驱动能力。</span><br></pre></td></tr></table></figure>]]></content>
+      <categories>
+        <category>招聘</category>
+      </categories>
+      <tags>
+        <tag>招聘</tag>
       </tags>
   </entry>
 </search>
