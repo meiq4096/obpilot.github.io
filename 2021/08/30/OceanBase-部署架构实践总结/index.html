@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="cn">
 <head>
   <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width">
@@ -26,9 +26,9 @@
 <meta property="og:type" content="article">
 <meta property="og:title" content="OceanBase 部署架构实践总结">
 <meta property="og:url" content="https://obpilot.github.io/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/index.html">
-<meta property="og:site_name" content="Hexo">
+<meta property="og:site_name" content="分布式数据库 OceanBase 技术分享">
 <meta property="og:description" content="本文总结 OceanBase 五花八门的部署架构及其原理，满足各个行业的企业的形形色色的数据库容灾和多活需求。有兴趣的看看。">
-<meta property="og:locale" content="en_US">
+<meta property="og:locale">
 <meta property="og:image" content="https://obpilot.github.io/images/16275469181084.jpg">
 <meta property="og:image" content="https://obpilot.github.io/images/16275509356582.jpg">
 <meta property="og:image" content="https://obpilot.github.io/images/16275511037010.jpg">
@@ -63,10 +63,10 @@
 
 
 
-<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"en","comments":true,"permalink":"https://obpilot.github.io/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/","path":"2021/08/30/OceanBase-部署架构实践总结/","title":"OceanBase 部署架构实践总结"}</script>
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"cn","comments":true,"permalink":"https://obpilot.github.io/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/","path":"2021/08/30/OceanBase-部署架构实践总结/","title":"OceanBase 部署架构实践总结"}</script>
 
 <script class="next-config" data-name="calendar" type="application/json">""</script>
-<title>OceanBase 部署架构实践总结 | Hexo</title>
+<title>OceanBase 部署架构实践总结 | 分布式数据库 OceanBase 技术分享</title>
   
 
 
@@ -101,9 +101,10 @@
 
     <a href="/" class="brand" rel="start">
       <i class="logo-line"></i>
-      <h1 class="site-title">Hexo</h1>
+      <h1 class="site-title">分布式数据库 OceanBase 技术分享</h1>
       <i class="logo-line"></i>
     </a>
+      <p class="site-subtitle" itemprop="description">分布式数据库 OceanBase 技术原理、开发运维实践分享</p>
   </div>
 
   <div class="site-nav-right">
@@ -161,7 +162,7 @@
           <div class="site-overview">
             <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
   <p class="site-author-name" itemprop="name">obpilot</p>
-  <div class="site-description" itemprop="description">obpilot home</div>
+  <div class="site-description" itemprop="description">本文主要分享蚂蚁的分布式关系型数据库OceanBase的产品功能、技术原理、开发运维、案例实践经验等。欢迎喜欢分布式数据库技术的朋友跟我沟通交流和分享！</div>
 </div>
 <div class="site-state-wrap site-overview-item animated">
   <nav class="site-state">
@@ -230,17 +231,17 @@
   
   
 
-  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="en">
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="cn">
     <link itemprop="mainEntityOfPage" href="https://obpilot.github.io/2021/08/30/OceanBase-%E9%83%A8%E7%BD%B2%E6%9E%B6%E6%9E%84%E5%AE%9E%E8%B7%B5%E6%80%BB%E7%BB%93/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
       <meta itemprop="name" content="obpilot">
-      <meta itemprop="description" content="obpilot home">
+      <meta itemprop="description" content="本文主要分享蚂蚁的分布式关系型数据库OceanBase的产品功能、技术原理、开发运维、案例实践经验等。欢迎喜欢分布式数据库技术的朋友跟我沟通交流和分享！">
     </span>
 
     <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="Hexo">
+      <meta itemprop="name" content="分布式数据库 OceanBase 技术分享">
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
