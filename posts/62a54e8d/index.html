@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="cn">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 5.4.0">
+
+
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+  <meta name="google-site-verification" content="SQw8_IUq7jRAGcByCN97Jk4AQ4otwO-p0ope0GrrsEU">
+  <meta name="baidu-site-verification" content="code-hEsLjFpoY4">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.3/css/all.min.css" integrity="sha256-2H3fkXt6FEmrReK448mDVGKb3WW2ZZw35gI7vqHOE4Y=" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@3.1.1/animate.min.css" integrity="sha256-PR7ttpcvz8qrF57fur/yAx1qXMFJeJFiA6pSzWi0OIE=" crossorigin="anonymous">
+
+<script class="next-config" data-name="main" type="application/json">{"hostname":"obpilot.github.io","root":"/","images":"/images","scheme":"Pisces","version":"8.7.0","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12},"copycode":true,"bookmark":{"enable":true,"color":"#222","save":"auto"},"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":"livere","storage":true,"lazyload":false,"nav":null},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"fadeInDown","post_body":"fadeInDown","coll_header":"fadeInLeft","sidebar":"fadeInUp"}},"prism":false,"i18n":{"placeholder":"Searching...","empty":"We didn't find any results for the search: ${query}","hits_time":"${hits} results found in ${time} ms","hits":"${hits} results found"}}</script><script src="/js/config.js"></script>
+<meta name="description" content="数据库选型用 OceanBase 的原因很多，其中一类是原数据库确实遇到难解的问题或瓶颈，需要采用分布式数据库技术来脱困。这类客户以运营商、互联网客户居多。本文就是总结这类客户业务在 OceanBase 上的实践经验。">
+<meta property="og:type" content="article">
+<meta property="og:title" content="OceanBase 分布式数据库设计实践（一）">
+<meta property="og:url" content="https://obpilot.github.io/posts/62a54e8d/index.html">
+<meta property="og:site_name" content="分布式数据库 OceanBase 技术分享">
+<meta property="og:description" content="数据库选型用 OceanBase 的原因很多，其中一类是原数据库确实遇到难解的问题或瓶颈，需要采用分布式数据库技术来脱困。这类客户以运营商、互联网客户居多。本文就是总结这类客户业务在 OceanBase 上的实践经验。">
+<meta property="og:locale">
+<meta property="article:published_time" content="2021-09-12T04:33:35.000Z">
+<meta property="article:modified_time" content="2021-09-12T04:35:19.510Z">
+<meta property="article:author" content="obpilot">
+<meta property="article:tag" content="开发">
+<meta property="article:tag" content="架构">
+<meta name="twitter:card" content="summary">
+
+
+<link rel="canonical" href="https://obpilot.github.io/posts/62a54e8d/">
+
+
+
+<script class="next-config" data-name="page" type="application/json">{"sidebar":"","isHome":false,"isPost":true,"lang":"cn","comments":true,"permalink":"https://obpilot.github.io/posts/62a54e8d/","path":"posts/62a54e8d/","title":"OceanBase 分布式数据库设计实践（一）"}</script>
+
+<script class="next-config" data-name="calendar" type="application/json">""</script>
+<title>OceanBase 分布式数据库设计实践（一） | 分布式数据库 OceanBase 技术分享</title>
+  
+
+
+
+
+  <noscript>
+    <link rel="stylesheet" href="/css/noscript.css">
+  </noscript>
+  <!-- 页面点击小红心 -->
+  <script type="text/javascript" src="/js/clicklove.js"></script>
+<!-- hexo injector head_end start -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.12.0/dist/katex.min.css">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/hexo-math@4.0.0/dist/style.css">
+<!-- hexo injector head_end end --></head>
+
+<body itemscope itemtype="http://schema.org/WebPage" class="use-motion">
+  <div class="headband"></div>
+
+  <main class="main">
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="Toggle navigation bar" role="button">
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+        <span class="toggle-line"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line"></i>
+      <h1 class="site-title">分布式数据库 OceanBase 技术分享</h1>
+      <i class="logo-line"></i>
+    </a>
+      <p class="site-subtitle" itemprop="description">分布式数据库 OceanBase 技术原理、开发运维实践分享</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul class="main-menu menu">
+        <li class="menu-item menu-item-home"><a href="/" rel="section"><i class="fa fa-home fa-fw"></i>Home</a></li>
+        <li class="menu-item menu-item-about"><a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>About</a></li>
+        <li class="menu-item menu-item-tags"><a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>Tags</a></li>
+        <li class="menu-item menu-item-categories"><a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>Categories</a></li>
+        <li class="menu-item menu-item-archives"><a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>Archives</a></li>
+        <li class="menu-item menu-item-schedule"><a href="/schedule/" rel="section"><i class="fa fa-calendar fa-fw"></i>Schedule</a></li>
+        <li class="menu-item menu-item-sitemap"><a href="/sitemap.xml" rel="section"><i class="fa fa-sitemap fa-fw"></i>Sitemap</a></li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+        
+  
+  <div class="toggle sidebar-toggle" role="button">
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+    <span class="toggle-line"></span>
+  </div>
+
+  <aside class="sidebar">
+
+    <div class="sidebar-inner sidebar-nav-active sidebar-toc-active">
+      <ul class="sidebar-nav">
+        <li class="sidebar-nav-toc">
+          Table of Contents
+        </li>
+        <li class="sidebar-nav-overview">
+          Overview
+        </li>
+      </ul>
+
+      <div class="sidebar-panel-container">
+        <!--noindex-->
+        <div class="post-toc-wrap sidebar-panel">
+            <div class="post-toc animated"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8E%9F%E6%95%B0%E6%8D%AE%E5%BA%93%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90%E4%BB%A5%E5%8F%8A%E5%BA%94%E5%AF%B9%E7%AD%96%E7%95%A5"><span class="nav-number">1.</span> <span class="nav-text">原数据库问题分析以及应对策略</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E8%BF%9E%E6%8E%A5%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90"><span class="nav-number">1.1.</span> <span class="nav-text">连接问题分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E7%A9%BA%E9%97%B4%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90"><span class="nav-number">1.2.</span> <span class="nav-text">空间问题分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E6%80%A7%E8%83%BD%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90"><span class="nav-number">1.3.</span> <span class="nav-text">性能问题分析</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%86%E5%BA%93%E5%88%86%E8%A1%A8%E9%97%AE%E9%A2%98%E5%88%86%E6%9E%90"><span class="nav-number">1.4.</span> <span class="nav-text">分库分表问题分析</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#OceanBase-%E5%88%86%E5%B8%83%E5%BC%8F%E8%83%BD%E5%8A%9B%E5%AE%9E%E8%B7%B5"><span class="nav-number">2.</span> <span class="nav-text">OceanBase 分布式能力实践</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E9%AB%98%E5%8F%AF%E7%94%A8"><span class="nav-number">2.1.</span> <span class="nav-text">高可用</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9A%E5%AE%9E%E4%BE%8B"><span class="nav-number">2.2.</span> <span class="nav-text">多实例</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%9A%E6%B4%BB"><span class="nav-number">2.3.</span> <span class="nav-text">多活</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%88%86%E5%8C%BA%E8%A1%A8"><span class="nav-number">2.4.</span> <span class="nav-text">分区表</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%88%86%E5%8C%BA%E5%AD%97%E6%AE%B5%E9%80%89%E6%8B%A9"><span class="nav-number">2.4.1.</span> <span class="nav-text">分区字段选择</span></a></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E6%9C%AC%E5%9C%B0%E7%B4%A2%E5%BC%95%E5%92%8C%E5%85%A8%E5%B1%80%E7%B4%A2%E5%BC%95"><span class="nav-number">2.4.2.</span> <span class="nav-text">本地索引和全局索引</span></a></li></ol></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%A4%8D%E5%88%B6%E8%A1%A8"><span class="nav-number">2.5.</span> <span class="nav-text">复制表</span></a></li></ol></li></ol></div>
+        </div>
+        <!--/noindex-->
+
+        <div class="site-overview-wrap sidebar-panel">
+          <div class="site-overview">
+            <div class="site-author site-overview-item animated" itemprop="author" itemscope itemtype="http://schema.org/Person">
+  <p class="site-author-name" itemprop="name">obpilot</p>
+  <div class="site-description" itemprop="description">这里主要分享蚂蚁的分布式关系型数据库OceanBase的产品功能、技术原理、开发运维、案例实践经验等。欢迎喜欢分布式数据库技术的朋友跟我沟通交流和分享！</div>
+</div>
+<div class="site-state-wrap site-overview-item animated">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+        <a href="/archives/">
+          <span class="site-state-item-count">9</span>
+          <span class="site-state-item-name">posts</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+          <a href="/categories/">
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">categories</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+          <a href="/tags/">
+        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-name">tags</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author site-overview-item animated">
+      <span class="links-of-author-item">
+        <a href="https://github.com/obpilot" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;obpilot" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:qing.meiq@gmail.com" title="E-Mail → mailto:qing.meiq@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="https://weibo.com/mq44944" title="Weibo → https:&#x2F;&#x2F;weibo.com&#x2F;mq44944" rel="noopener" target="_blank"><i class="fab fa-weibo fa-fw"></i>Weibo</a>
+      </span>
+  </div>
+
+
+
+          </div>
+        </div>
+      </div>
+        <div class="back-to-top animated" role="button" aria-label="Back to top">
+          <i class="fa fa-arrow-up"></i>
+          <span>0%</span>
+        </div>
+    </div>
+  </aside>
+  <div class="sidebar-dimmer"></div>
+
+
+    </header>
+
+    
+  <div class="reading-progress-bar"></div>
+  <a role="button" class="book-mark-link book-mark-link-fixed"></a>
+
+  <a href="https://github.com/obpilot" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+<noscript>
+  <div class="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+
+    <div class="main-inner post posts-expand">
+
+
+  
+
+
+<div class="post-block">
+  
+  
+
+  <article itemscope itemtype="http://schema.org/Article" class="post-content" lang="cn">
+    <link itemprop="mainEntityOfPage" href="https://obpilot.github.io/posts/62a54e8d/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="obpilot">
+      <meta itemprop="description" content="这里主要分享蚂蚁的分布式关系型数据库OceanBase的产品功能、技术原理、开发运维、案例实践经验等。欢迎喜欢分布式数据库技术的朋友跟我沟通交流和分享！">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="分布式数据库 OceanBase 技术分享">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          OceanBase 分布式数据库设计实践（一）
+        </h1>
+
+        <div class="post-meta-container">
+          <div class="post-meta">
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-calendar"></i>
+      </span>
+      <span class="post-meta-item-text">Posted on</span>
+      
+
+      <time title="Created: 2021-09-12 12:33:35 / Modified: 12:35:19" itemprop="dateCreated datePublished" datetime="2021-09-12T12:33:35+08:00">2021-09-12</time>
+    </span>
+    <span class="post-meta-item">
+      <span class="post-meta-item-icon">
+        <i class="far fa-folder"></i>
+      </span>
+      <span class="post-meta-item-text">In</span>
+        <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+          <a href="/categories/architecture/" itemprop="url" rel="index"><span itemprop="name">架构</span></a>
+        </span>
+    </span>
+
+  
+    <span class="post-meta-item" title="Views" id="busuanzi_container_page_pv">
+      <span class="post-meta-item-icon">
+        <i class="far fa-eye"></i>
+      </span>
+      <span class="post-meta-item-text">Views: </span>
+      <span id="busuanzi_value_page_pv"></span>
+    </span>
+    <span class="post-meta-break"></span>
+    <span class="post-meta-item" title="Symbols count in article">
+      <span class="post-meta-item-icon">
+        <i class="far fa-file-word"></i>
+      </span>
+      <span class="post-meta-item-text">Symbols count in article: </span>
+      <span>6.7k</span>
+    </span>
+    <span class="post-meta-item" title="Reading time">
+      <span class="post-meta-item-icon">
+        <i class="far fa-clock"></i>
+      </span>
+      <span class="post-meta-item-text">Reading time &asymp;</span>
+      <span>6 mins.</span>
+    </span>
+</div>
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+        <p>数据库选型用 OceanBase 的原因很多，其中一类是原数据库确实遇到难解的问题或瓶颈，需要采用分布式数据库技术来脱困。这类客户以运营商、互联网客户居多。本文就是总结这类客户业务在 OceanBase 上的实践经验。</p>
+<span id="more"></span>
+
+<h2 id="原数据库问题分析以及应对策略"><a href="#原数据库问题分析以及应对策略" class="headerlink" title="原数据库问题分析以及应对策略"></a>原数据库问题分析以及应对策略</h2><h3 id="连接问题分析"><a href="#连接问题分析" class="headerlink" title="连接问题分析"></a>连接问题分析</h3><p>这一类业务原数据库一般是 ORACLE 数据库。当业务量增长，应用规模变多，创建的数据库连接也会很多，导致 DBA 不能不出规定限制一下应用的连接数。</p>
+<p>连接数太多在 ORACLE 上会成为问题，主要原因还是每个用户连接是一个进程，进程有自己的私有内存（UGA），并发高时，ORACLE 多进程之间的通信也耗CPU。任凭小机处理能力再强也经不起客户端连接数的任意增长。</p>
+<p>在 OceanBase 里，连接数不是问题。每个用户连接是一个线程。用户连接发起的请求会被放到一个内部请求池里，由内部工作线程去处理。内部工作线程数量并不大，跟实例资源的 CPU 规格有关系，默认是实例 CPU 的 10 倍。此外，在 OceanBase 集群前端还有个反向代理 OBPROXY （生产环境，在反向代理 OBPROXY 前面还有个 负载均衡 F5 或者 LVS等产品，不影响结论，这里略去不提）。应用实际上是跟 OBPROXY 建立连接，每个连接也是一个线程。每个 OBPROXY 默认可以创建 8000 个用户连接，这个参数可以调大到 6w ，会多消耗一些 CPU 。OBPROXY 只做 SQL 路由，不做运算，所以对 CPU 消耗也不是很大。资源充足的情况下，每个 OBPROXY 的 SQL路由能力是单核 2w。而且在实际部署中至少有 2个 OBPROXY，可以多个分担负载。</p>
+<p><strong>所以，在 OceanBase 数据库里，连接数很难成为首要问题或者瓶颈。</strong></p>
+<h3 id="空间问题分析"><a href="#空间问题分析" class="headerlink" title="空间问题分析"></a>空间问题分析</h3><p>这一类业务一般是运营商行业或者互联网行业有面向终端消费者业务的。用户量大，访问量大，导致业务积累了很多交易数据。<br>如果原数据库是 ORACLE 数据库，一般已经做了分区表，多是按时间分区（按月/周/日分区）。数据库文件规模通常在 十几T 或者 几十T 以上了。<br>如果原数据库是 MySQL 数据库，大部分就是单表了（MySQL 分区表功能据说不好用），也有部分可能用了分库分表技术做了水平拆分。有电商客户案例MySQL 单表数据量 120 亿还能跑（并发不高）。</p>
+<p>数据量大的苦恼就是磁盘扩容成本越来越高。如果使用了存储，存储的容量也有上限。如果使用云主机产品，本地 SSD 数目和容量也有限，云盘（ESSD） 也有数量和容量的上限。只要业务在增长，触达瓶颈只是时间问题。实际上，当表容量非常大的时候，可能会先触达性能瓶颈。</p>
+<p>在 OceanBase 里，数据存储时除了可以选择压缩算法外，还可以选择编码技术，极大的降低了数据的存储空间。在 OceanBase 的客户案例里，ORACLE 数据迁移到 OceanBase ，单副本空间可以做到之前的 1/5 。MySQL 业务案例里，近 20T 的 MySQL 数据在 OceanBase 里单副本实际存储空间大概 4.3 T 左右。而性能方面，通过编码技术节省存储空间这个数据并不需要解码操作，不消耗 CPU ，所以整体性能差异并不大。 OceanBase 企业版默认就开启了高级压缩特性。有关这个压缩特性请参考《OceanBase 2.0的高级数据压缩特性》。</p>
+<p>不过就空间运维而言，从 ORACLE / MySQL 迁移到 OceanBase 后还是有点变化。 OceanBase 目前只支持一个数据文件（名字叫 <code>block_file</code>），其空间大小是预分配式的。默认取所在磁盘目录空间的 95% 。当然如果磁盘后期扩容了，这个文件大小上限也可以自动扩。不过对磁盘扩容不是 OceanBase 的标准玩法。</p>
+<h3 id="性能问题分析"><a href="#性能问题分析" class="headerlink" title="性能问题分析"></a>性能问题分析</h3><p>在 ORACLE / MYSQL 里，表数据量到了亿级别继续增长的话，性能上可能会感觉越来越慢。其他维护操作（表结构变更、表备份恢复等）可能也会感觉比较麻烦。有的是真碰到性能问题急需解决，有的是担心将来有性能问题再解决来不及。</p>
+<p>性能变慢也分读变慢和写变慢。<br>读查询通常也能走索引，不过业务比较复杂，表上的索引也很多。尤其以单列索引居多。往往业务查询条件很多，只是部分字段能命中索引，然后还有大量的索引回表操作。随着数据量的增长，数据存储空间变大，回表的成本也在增长，所以理论上是性能会下降的。有时候这些索引也建的并不合适（单列索引值得商榷的空间最大）。写操作通常也跟索引有关系。<code>update</code> 和 <code>delete</code> 操作也有查询条件要走索引，然后更新数据时还要更新索引数据。当表上索引数量很多（超过10个）时，索引对数据更新的影响也是很明显的。<br>由于索引很多都是业务开发创建的，每个业务的开发只管自己的查询，并不一定能全盘考虑。索引是否最优是个未知数。但数据库性能变慢是所有人都能看懂的事实。于是传统数据库背锅，业务寄希望于分布式数据库能解决。</p>
+<p>分布式数据库确实有很多办法应对这个挑战。<br>首先是通过水平拆分技术将一个大表的数据分散到多个实例多台机器上（多台机器是关键）。水平拆分技术有分库分表、分区表和存储切片三类技术。这里主要讨论 前两者。水平拆分技术原理详情可以参考《数据水平拆分方案》。</p>
+<p>分库分表技术将业务大表拆分多个分片，每个分片是一个实际存在的物理表。分区表拆分后的每一个分片是一个分区，是表的子集，不是分表。两种技术的产品都呈现给业务的是一一个业务表。前者呈现的是逻辑表，后者呈现的是物理表。这是二者原理的区别。不同的分片相比原表，不仅数据量小，存储空间也小，很多小范围的数据查询和修改性能都会提升。此外，不同的分片如果落到不同的机器上，则可以将多台机器的存储能力和计算能力（CPU、内存和IO）都同时运用起来，总体处理能力也会提升。</p>
+<p>不过，分布式除了带来好处，也带来挑战。那就是跨机的查询和事务。</p>
+<p>在分库分表技术里，这个处理复杂度很高，只有少数几家厂商产品实现了这个功能。但是都有一个问题，就是数据强一致和读写性能方面要有取舍。数据强一致包含跨机的查询数据都满足MVCC、跨机的事务修改的数据要是强一致的（不能是最终一致性解决方案）。<br>在 OceanBase 里，自 2.0版本后，跨机的分布式查询和分布式事务都支持（指满足强一致），性能方面也不差。强一致要求会对性能有损耗，损耗多少就是 SQL 引擎的基本功，OceanBase 始终把数据强一致放在首位。当然，平时大家听到的或者理解的强一致可能更多的是指机器故障前后数据不丢（RPO=0）那个。无论指哪个，这句话都是对的。</p>
+<p>很长一段时间，也只有 TiDB 和 OceanBase 这两个原生的分布式关系型数据库真正实现了符合数据库规范的分布式查询和分布式事务。分库分表技术产品方案都是通过多个组件协同工作实现类似的功能。</p>
+<h3 id="分库分表问题分析"><a href="#分库分表问题分析" class="headerlink" title="分库分表问题分析"></a>分库分表问题分析</h3><p>也有些互联网业务已经探索了分库分表的水平拆分技术。但是由于业务数据量大、以及访问量大，也有很多通点。<br>比如说：</p>
+<ul>
+<li>大表在线DDL导致从库延时很大。分库分表技术将一个大的DDL 拆分为多个分表的 DDL。表数据量大的时候，ONLINE DDL会导致MySQL 的从库出现很大延迟。</li>
+<li>大表在线 DDL 可能阻塞 DML。在 MySQL 的 Online DLL的开始和结束阶段，涉及到元数据的变更时会尝试加表锁，会阻塞 DML。此外有些 DDL还不支持 Online，也会阻塞 DML。</li>
+<li>大表在线 DDL 在机器故障后处理过程比较麻烦。当 DDL 进行中，有 MySQL 机器出现故障。首先会话要报错（DDL 部分成功部分失败），失败的 MySQL 要主从切换。主从切换时如果有 Binlog 丢失（异步同步），则还需要修复主从同步。然后还要在新主上重新开始 DDL 。</li>
+<li>小表广播故障时问题。广播表适合那些不能做拆分的配置表，但是会频繁的跟其他拆分过的分表做表连接，广播表会把数据通过Binlog复制技术应用到所有实例的分库中，这个同步是外部逻辑同步，其可靠性最高不超过 MySQL的Binlog复制。其麻烦也是在同步过程中出现机器故障后，处理过程比较麻烦。风险是故障后广播表多个副本数据不一致。</li>
+<li>大量分库拆分，导致MySQL实例和机器规模增长很快，运维成本增加。在淘宝内部业务，核心业务单机跑2个MySQL实例，其次跑4个、8个、16个也有。很多长尾业务都是小实例，每个机器上可能有几十个 MySQL 实例。其运维成本和风险会增加，当然厂商产品也会有自动化运维平台（DB PaaS 平台）。其麻烦依然是在出现机器故障后。只要有三四个实例要修复主从同步，DBA 半天的时间就过去了。</li>
+</ul>
+<p>在 OceanBase 里，上面大部分问题会因为技术方案不同而有所改变。</p>
+<ul>
+<li>首先，OceanBase 每笔事务默认就是三副本强同步，Paxos协议会保证至少一半成员事务日志落盘了，这个事务才会成功。这个对主副本的事务提交性能会有制约。说通俗一点，主副本不能甩开备副本自由酣畅的跑了（MySQL “自由”的代价就是出问题的时候，备副本延迟太大导致主备不一致。）。此外，由于 OceanBase 事务日志同步粒度是</li>
+<li>第二，OceanBase的三副本强同步的另外一个好处就是OceanBase的高可用能力会时刻处于可用状态。只要发生少数派机器故障，内部就切换（选举出新的主副本），并且OceanBase保证数据跟故障前是绝对一致的（RPO=0）。故障机器恢复后，原来的DDL可以继续，不需要运维介入处理。也没有内部数据不一致。</li>
+<li>第三，OceanBase的数据存储模型是 LSM Tree。所以 OceanBase 里的 DDL 都是 Online DDL，不会阻塞 DML。当然，OceanBase 目前的缺陷也有，有很多 DDL 都不支持。比如说加主键、改列的类型（大类变换）等等。这个预计在 3.2 某个版本就会支持了。</li>
+<li>第四，不能拆分的配置表可以在 OceanBase 里配置为复制表，OceanBase会自动将复制表的变更数据同步到实例所在的所有机器（也可以指定机器范围）。这种同步是全同步策略，全部成功事务才提交，所以所有副本数据都是完全一致的。这种同步在机器故障的时候，会自动剔除故障节点，也不需要运维介入。故障机器恢复后，自动恢复数据同步，并自动恢复到全同步成员中。</li>
+<li>第五，OceanBase只要一个实例，实例里表用分区表就可以替换原分库分表架构。实例可以在线扩容和缩容，负载均衡和数据同步都是 OceanBase 内部逻辑，运维非常的“省心”。</li>
+</ul>
+<h2 id="OceanBase-分布式能力实践"><a href="#OceanBase-分布式能力实践" class="headerlink" title="OceanBase 分布式能力实践"></a>OceanBase 分布式能力实践</h2><p>OceanBase的分布式能力包含：高可用、多实例、多活、分区表、复制表。</p>
+<h3 id="高可用"><a href="#高可用" class="headerlink" title="高可用"></a>高可用</h3><p>高可用指的的分布式数据库 OceanBase 集群里有机器故障的时候，数据库访问服务在中断后能自动恢复。很多人可能不把高可用能力当作分布式能力，但这个是OceanBase 最核心基础的能力（不可剥夺）。这里就简单提一下，OceanBase的高可用能力就是少数派机器故障，自动切换（RTO~30s），数据不丢（RPO=0)。故障恢复后，数据同步自动恢复，非常的省心。</p>
+<h3 id="多实例"><a href="#多实例" class="headerlink" title="多实例"></a>多实例</h3><p>多实例就是多租户，实例更通俗一些。OceanBase 以集群形式部署，提供给业务的是实例。集群在每个机器上只有一个进程，实例是逻辑实例，对业务完全透明，体感跟单实例一样。实例提供原生的 SQL 能力和事务能力，分布式细节对使用者完全透明。</p>
+<p>OceanBase 的多实例可以提高对机器资源的利用率，根据业务需求有多种使用方法。关于 OceanBase 多实例的部署形态可以参考前面文章《闲话OB部署架构》。其关键点就是 实例的主副本位置策略（<code>PRIMARY_ZONE</code>）的设置。默认情况下设置为一个 <code>zone</code>，以及 <code>unit_num</code> 设置为 1 。业务压力大的实例，有很多分区表的实例，可以考虑 将 <code>unit_num</code> 设置为 2 以及 <code>PRIMARY_ZONE</code> 设置为多个 <code>zone</code>，以提升实例的总体处理能力。</p>
+<p>OceanBase 多实例之间有资源隔离（CPU和内存），数据完全隔离。不过现在也支持 DBLINK 联通不同 ORACLE 实例之间的数据。</p>
+<h3 id="多活"><a href="#多活" class="headerlink" title="多活"></a>多活</h3><p>前文《闲话OB部署架构》里也解释了 OceanBase实例跟传统 ORACLE/MYSQL 实例的不同。OceanBase 可以很好的将集群的多台机器都提供服务，这就是多活能力。<br>多实例和多话能力结合使用，将不同实例的压力在集群机器之间可以实现一定程度的错开。<br>在 OceanBase 里做读写分离也是很方便的。在三副本之外增加一个只读副本，就可以专门用于只读查询业务。OceanBase 保证只读副本的数据只会有延时，绝不会有错误。</p>
+<h3 id="分区表"><a href="#分区表" class="headerlink" title="分区表"></a>分区表</h3><p>OceanBase 分布式最核心能力之一就是分区表，这个概念跟 ORACLE 分区表是一样的。分区表详情可以参考《OceanBase 分区表有什么不同》。</p>
+<p>分区表的用法就是选一个字段当作分区字段，按照某种策略（LIST\HASH\RANGE\二级分组组合）拆分表数据为多个分区。当业务表非常多的时候，比较麻烦的也是这个分区字段的选择。</p>
+<p>精力有限的情况下，建议是抓住关键的表，有这么些策略选择表：</p>
+<ul>
+<li>业务主要流程的相关表。如订单业务，那就是订单表、订单历史表、会员表。 支付业务就是支付订单表、支付历史表等等。每个表如果有通过业务外键关联的表都算上。</li>
+<li>业务数据量在 1 亿以上的大表。或者业务访问量（QPS）非常高的表。</li>
+<li>核心业务查询很慢的 SQL 对应的表。</li>
+</ul>
+<h4 id="分区字段选择"><a href="#分区字段选择" class="headerlink" title="分区字段选择"></a>分区字段选择</h4><p>对于核心业务相关表，当表之间都遵循 3NF 设计的时候，有两种做法。<br>一种做法就是加入冗余列（比如说会员id）。因为所有表数据都是围绕会员的，所有表都根据会员 ID 做 HASH 分区。这些相关的表就可以放到一个表分组中。这是最优的设计。<br>不过由于表很多的时候，老业务用户可能不想改动。那就退而求其次，选第二个方案。每个表独立的选择分区字段。对于主表，如果有自增 ID 做主键，简单一点就使用自增 iD 作为分区键。OceanBase目前版本（3.1以及以前）还不支持自增ID 作为分区键，就需要换一个业务字段。OceanBase 预计在 3.2 某个版本支持以自增 ID 作为分区键主键。更好的建议是用业务字段。因为业务查询带上业务字段的概率更高。<br>这样不同表的分区字段不一样，关联查询的时候可能会出现 1:N 或者 M:N 这样的查询模型，这个在 OceanBase里很可能是跨机的请求，但是这种查询可以发挥多机并行能力，所以性能也比较好。</p>
+<h4 id="本地索引和全局索引"><a href="#本地索引和全局索引" class="headerlink" title="本地索引和全局索引"></a>本地索引和全局索引</h4><p>当分区表分区字段定了后，总会有很多查询是不带分区键的，建议优先用本地分区索引。有些人了解 OceanBase 分区表原理后，可能会觉得本地索引很慢，用全局索引会更好。实际上，用本地索引时，会扫描所有分区的本地索引，OceanBase可以在分区间并行，这个扫描也不会特别慢。当索引返回的数据量很少的时候，这个性能是很好的。<br>全局索引对少量数据查询场景是非常有好的。但是如果索引过滤数据不高返回很多数据的时候，全局索引的性能可能会比本地索引性能还要差。因为全局索引是独立的分区，本地索引跟数据是在一个分区上的。查询时使用全局分区索引，在索引回表的时候很有可能是分布式查询，回表数据量很大的时候，这个性能会有所下降。当然，技术上OceanBase SQL引擎也是有一些优化去缓解这个影响。<br>此外，正如索引会降低数据修改（DML）的性能，全局索引对数据修改（DML）的影响会更明显一些。因为这个修改很可能就是一个跨机的分布式事务。这也是一个考虑因素。</p>
+<p>索引是为最重要的查询场景服务的，其代价就是写入的性能，全局索引更是如此。如果一定要用，要控制数量，要控制使用场景一定是非常重要且必要的场景。要避免滥用索引包括全局索引。这就是业务开发建索引不靠谱的地方。重要表的索引的创建应该由专业的DBA来审核或者创建。</p>
+<h3 id="复制表"><a href="#复制表" class="headerlink" title="复制表"></a>复制表</h3><p>跟索引的使用思想一样，复制表是另外一个需要权衡考虑的方案。</p>
+<p>复制表主要解决一些表业务上决定了不能拆分（分区）或者没有必要拆分，但它又频繁的跟分区表有关联关系。为了减少不必要的跨机分布式查询，复制表将自己的数据强同步到实例的所有机器上，所以不管分区表的分区的主副本在哪个机器上，它都可以在 同机跟复制表的副本做表连接。<br>OceanBase 里普通的表多是三副本，但是在一个 2-2-2 的租户（实例）里，复制表的副本可以是六副本，并且还是全同步，六个副本事务日志同时落盘事务才提交。所以复制表的写性能会比 Paxos协议强同步策略要慢一些，适合写入TPS 不高的业务表（如配置表、参数表）。这就是复制表的代价。</p>
+<p>以上是复制表常用用法。</p>
+<p>还有更极端一点的用法，为了避免两个分区表的跨节点的M:N 的连接，也可以将其中一个分区表做成复制表。这样做的可能原因只会是因为收益大于成本。这需要先测试验证一下。</p>
+<p>普通表到复制表的转换可以在线做，也很方便，就是改变表的一个属性。运维也是相当简单。扩充副本（3副本到6副本）的时候会需要一些数据迁移时间。</p>
+
+    </div>
+
+    
+    
+    
+
+    <footer class="post-footer">
+          <div class="followme">
+  <span>Welcome to my other publishing channels</span>
+
+  <div class="social-list">
+
+      <div class="social-item">
+        <a target="_blank" class="social-link" href="/images/0.5.jpg">
+          <span class="icon">
+            <i class="fab fa-weixin"></i>
+          </span>
+
+          <span class="label">WeChat</span>
+        </a>
+      </div>
+  </div>
+</div>
+
+          <div class="post-tags">
+              <a href="/tags/developer/" rel="tag"># 开发</a>
+              <a href="/tags/architecture/" rel="tag"># 架构</a>
+          </div>
+
+        
+
+          <div class="post-nav">
+            <div class="post-nav-item">
+                <a href="/posts/a5ed3b8f/" rel="prev" title="OceanBase JDBC 连接方法">
+                  <i class="fa fa-chevron-left"></i> OceanBase JDBC 连接方法
+                </a>
+            </div>
+            <div class="post-nav-item">
+            </div>
+          </div>
+    </footer>
+  </article>
+</div>
+
+
+
+
+
+
+</div>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+
+
+<div class="copyright">
+  &copy; 
+  <span itemprop="copyrightYear">2021</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">obpilot</span>
+</div>
+<div class="wordcount">
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-chart-line"></i>
+    </span>
+    <span title="Symbols count total">93k</span>
+  </span>
+  <span class="post-meta-item">
+    <span class="post-meta-item-icon">
+      <i class="fa fa-coffee"></i>
+    </span>
+    <span title="Reading time total">1:25</span>
+  </span>
+</div>
+<div class="busuanzi-count">
+    <span class="post-meta-item" id="busuanzi_container_site_uv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-user"></i>
+      </span>
+      <span class="site-uv" title="Total Visitors">
+        <span id="busuanzi_value_site_uv"></span>
+      </span>
+    </span>
+    <span class="post-meta-item" id="busuanzi_container_site_pv">
+      <span class="post-meta-item-icon">
+        <i class="fa fa-eye"></i>
+      </span>
+      <span class="site-pv" title="Total Views">
+        <span id="busuanzi_value_site_pv"></span>
+      </span>
+    </span>
+</div>
+  <div class="powered-by">Powered by <a href="https://hexo.io/" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/pisces/" rel="noopener" target="_blank">NexT.Pisces</a>
+  </div>
+
+    </div>
+  </footer>
+
+  
+  <script src="https://cdn.jsdelivr.net/npm/animejs@3.2.1/lib/anime.min.js" integrity="sha256-XL2inqUJaslATFnHdJOi9GfQ60on8Wx1C2H8DYiN1xY=" crossorigin="anonymous"></script>
+<script src="/js/comments.js"></script><script src="/js/utils.js"></script><script src="/js/motion.js"></script><script src="/js/next-boot.js"></script><script src="/js/bookmark.js"></script>
+
+  
+
+
+
+
+
+  
+  <script async src="https://busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
+
+
+
+
+
+</body>
+</html>
