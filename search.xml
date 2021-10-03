@@ -1007,4 +1007,96 @@
         <tag>架构</tag>
       </tags>
   </entry>
+  <entry>
+    <title>从ORACLE/MySQL到OceanBase：参数或变量</title>
+    <url>/posts/3c53125f/</url>
+    <content><![CDATA[<p>近期打算写一个【从ORACLE/MySQL到OceanBase】序列。本文是第三篇。前期直播回放请到：<code>https://cs.enmotech.com/course/play/17</code> 。</p>
+<span id="more"></span>
+
+<h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><p>OceanBase和ORACLE一样， 定位都是通用的关系型数据库。然而客户业务场景、环境总是千奇百怪。所以数据库需要支持各种参数以满足不同客户需求。</p>
+<p>OceanBase里的参数就影响范围分集群级别和租户级别两类。<br>OB集群参数的做法参照ORACLE的参数做法(即<code>parameters</code>) 。OB的租户别名是实例，跟实际机器是解耦的，租户的参数参照MySQL实例的做法又叫变量(<code>variables</code>)。光研究OceanBase的参数和变量就可以感受到这是一个功能强大又非常有趣的数据库。</p>
+<p>下面就一一介绍影响OB使用的参数和变量。</p>
+<h2 id="集群参数"><a href="#集群参数" class="headerlink" title="集群参数"></a>集群参数</h2><h3 id="查看和修改参数"><a href="#查看和修改参数" class="headerlink" title="查看和修改参数"></a>查看和修改参数</h3><p>首先查看集群参数是需要登录到sys租户里。用户名：<code>root@sys#集群名</code></p>
+<ul>
+<li>查看参数语法如下：</li>
+</ul>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">show</span> parameters;</span><br><span class="line"><span class="keyword">show</span> parameters <span class="keyword">like</span> <span class="string">&#x27;%limit%&#x27;</span>;</span><br><span class="line"><span class="keyword">show</span> parameters</span><br><span class="line"><span class="keyword">where</span> name <span class="keyword">in</span> (<span class="string">&#x27;clog_disk_usage_limit_percentage&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;data_disk_usage_limit_percentage&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;resource_hard_limit&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;resource_soft_limit&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;memstore_limit_percentage&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;memory_limit_percentage&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;sql_audit_memory_limit&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;memory_limit&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;major_freeze_duty_time&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;minor_freeze_times&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;freeze_trigger_percentage&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;enable_sql_audit&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;sql_audit_queue_size&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;sql_audit_memory_limit&#x27;</span>,</span><br><span class="line"><span class="string">&#x27;enable_rebalance&#x27;</span></span><br><span class="line">);</span><br></pre></td></tr></table></figure>
+
+<p><img src="/images/15620561131970.jpg" alt="-w1400"></p>
+<p>从上面可以看出几个特点：参数有名称、默认值和描述，以及生效方法(是否需要重启)、生效节点(<code>IP</code>和<code>Port</code>)、参数归属模块，是否可见等。每个参数在每个节点上都有一份，其值默认一样可以不一样(当然实际不推荐这样)。</p>
+<p>这里列举的参数都是OceanBase集群使用过程中会涉及到的，非常重要。后面会逐一解释。</p>
+<ul>
+<li>修改参数语法</li>
+</ul>
+<p>目前修改参数支持集群所有节点同时修改或者只改某几个节点。</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">ALTER</span> <span class="keyword">SYSTEM</span> <span class="keyword">SET</span> param_name <span class="operator">=</span> expr </span><br><span class="line">     [COMMENT <span class="string">&#x27;text&#x27;</span>] </span><br><span class="line">     [<span class="keyword">SCOPE</span> <span class="operator">=</span> conf_scope] </span><br><span class="line">     [TENANT <span class="operator">=</span> ‘tenantname’];</span><br><span class="line">     </span><br><span class="line"><span class="keyword">alter</span> <span class="keyword">system</span> <span class="keyword">set</span> minor_freeze_times<span class="operator">=</span><span class="number">100</span>;</span><br><span class="line"><span class="keyword">alter</span> <span class="keyword">system</span> <span class="keyword">set</span> freeze_trigger_percentage<span class="operator">=</span><span class="number">75</span> server<span class="operator">=</span><span class="string">&#x27;11.***.84.132:2882&#x27;</span>;     </span><br></pre></td></tr></table></figure>
+
+<p><img src="/images/15620560372217.jpg" alt="-w1361"></p>
+<h3 id="参数文件"><a href="#参数文件" class="headerlink" title="参数文件"></a>参数文件</h3><p>跟ORACLE不一样的是，OceanBae集群参数修改后都会立即持久化到本地参数文件里。这个参数文件对集群启动非常重要，所以OceanBase提供多重路径保存这个参数。类似于ORACLE保存数据库控制文件一样。而这个多重路径也是参数<code>config_additional_dir</code> 指定的。</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">show</span> parameters <span class="keyword">like</span> <span class="string">&#x27;%config_additional_dir%&#x27;</span>;</span><br></pre></td></tr></table></figure>
+<p><img src="/images/15620559769288.jpg" alt="-w1399"></p>
+<p>参数文件名叫:<code>observer.config.bin</code>,文件类型是二进制格式，不能直接编辑或用查看，需要用 <code>strings</code>命令查看。这点跟ORACLE的<code>pfile</code>不一样。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="variable">$file</span> observer.config.bin</span><br><span class="line">observer.config.bin: data</span><br><span class="line"><span class="variable">$strings</span> observer.config.bin|egrep <span class="string">&quot;minor_freeze_times|freeze_trigger_percentage&quot;</span></span><br><span class="line">minor_freeze_times=100</span><br><span class="line">freeze_trigger_percentage=75</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>所以，修改每个节点的参数文件的方法通常是在集群里用命令修改。每次修改后，参数文件都会保留上一个版本在文件<code>observer.config.bin.history</code>里，以避免参数修改错误导致集群启动失败。<br>思维严谨的人很快就会发现如果这个节点的<code>OBServer</code>进程不存在，那么通过集群修改参数就会失败。所以这点也要留意。<br>此外，细心的人可能还会有个问题，参数文件是保存在多个目录的，但是参数目录又要先指定参数。如果是在集群里指定，得先<code>OBServer</code>进程启动，而进程既然启动了说明又先有参数文件了。而这个参数文件不能编辑，最初是不存在的。这里有个“先有鸡还是先有蛋”的问题。</p>
+<p>所以上面列举的大部分参数是可以在<code>OBServer</code>启动时指定。如果没有指定就用默认值。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">cd</span> /home/admin/node1/oceanbase &amp;&amp; /home/admin/node1/oceanbase/bin/observer -i eth0 -P 2882 -p 2881 -z zone1 -d /home/admin/node1/oceanbase/store/obdemo -r <span class="string">&#x27;192.168.1.241:2882:2881;192.168.1.81:2882:2881;192.168.1.86:2882:2881&#x27;</span> -c 20190423 -n obdemo -o <span class="string">&quot;cpu_count=24,memory_limit=100G,datafile_size=200G,config_additional_dir=/data/data/1/obdemo/etc3;/data/log/log1/obdemo/etc2&quot;</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>其中 <code>-o</code> 就是用于覆盖OB集群参数的默认值。一旦<code>OBServer</code>进程启动成功后，三个参数文件就生成了。</p>
+<h3 id="进程启动参数解释"><a href="#进程启动参数解释" class="headerlink" title="进程启动参数解释"></a>进程启动参数解释</h3><p>上面进程启动参数有多个，多跟资源有关。这里一一解释一下，应该能解答对前文《OceanBase数据库实践入门——手动搭建OceanBase集群》里的一些疑惑。</p>
+<ul>
+<li><code>config_additional_dir</code>：参数冗余目录。已经解释过。</li>
+<li><code>cpu_count</code>：指定<code>OS</code>的逻辑<code>CPU</code>个数。通常不指定的时候，<code>OBServer</code>也可以自己获取，跟<code>lscpu</code>里结果一致。但是当需要单机启动多个<code>OBServer</code>进程的时候，可能就需要平分一下物理机的<code>CPU</code>。另外一个用途就是反过来的，当物理机或者虚拟机<code>CPU</code>很少时，故意调大这个参数可以欺骗<code>OBServer</code>进程，以让它能启动(否则<code>CPU</code>少于6个，<code>OBServer</code>可能会启动失败)。</li>
+<li><code>memory_limit</code>:指定<code>OS</code>的内存大小。同样不指定的时候，会默认取<code>OS</code>总内存的一定比例。这个比例是另外一个参数<code>memory_limit_percentage</code>控制，默认值是<code>80%</code>。当单机启动多个进程时，需要通过参数<code>memory_limit</code>平分主机内存。由于进程启动时对内存是独占式的，且会理解分配一定大小的内存，所以这个参数不能欺骗<code>OB</code>，否则运行过程中<code>OBServer</code>会报内存不足而不稳定或者根本就无法启动。</li>
+<li><code>datafile_size</code>：指定<code>OBServer</code>启动后数据目录的空间大小。不指定的时候，会默认取数据目录空间的一定比例。这个比例是另外一个参数<code>data_disk_usage_limit_percentage</code>指定，默认值是<code>90%</code>。同样，<code>OBServer</code>启动后，会立即初始化一个数据文件(<code>sstable</code>)，大小就是<code>datafile_size</code>。所以，这个参数也不能欺骗<code>OB</code>，否则会启动失败。当单机启动多个<code>OBServer</code>进程时，会需要取设定这个参数值，以平分存储空间。</li>
+<li><code>clog_disk_usage_limit_percentage</code>：指定<code>OBServer</code>的<code>clog</code>可用空间占目录比例。通常目录空间使用率<code>100%</code>就是空间满，<code>OBServer</code>为避免写事务日志因为磁盘空间满而出问题，将这一比例降到<code>clog_disk_usage_limit_percentage</code>指定的值。默认值是<code>95%</code>。这样当到达<code>95%</code>时<code>OBServer</code>因为写不进<code>clog</code>就出现集群异常，这个时候如果不能清理目录释放空间的话，还可以临时重启<code>OBServer</code>进程指定这个参数更大一些来临时修复问题，此后还是需要尽快对磁盘扩容。</li>
+</ul>
+<p>在启动参数里有个<code>-r</code>参数比较特别，它是指定<code>rootservice_list</code>地址的。实际上这个地址也是集群的一个参数。在集群初始化成功后保存到参数文件中。(有关<code>rootservice</code>可以参考文章《OceanBase数据库实践入门——了解总控服务》。)</p>
+<p>不过这样还不是很方便。对于集群初始化时的三个节点，指定这个<code>rootservice_list</code>是有必要的。但对于后续新增的节点，如果每个节点都要取指定这个参数值就不方便，因为这个参数的值还有可能会动态的变化，如果要求运维人员记住这个参数变化后的值这是一个负担。所以<code>OBServer</code>在<code>rootservice_list</code>参数变化后将值保存到远端的一个数据库里。不过不是直接写入到那个数据库，而是远端提供了一个<code>API</code>用于响应读取和写入这个参数值。这个<code>API</code>又是通过参数<code>obconfig_url</code>指定的。</p>
+<p>所以启动<code>OBServer</code>进程的时候必须指定<code>rootservice_list</code>，这个地址可以手动指定一堆<code>IP</code>，或者指定<code>obconfig_url</code>地址。二选一。<code>obconfig_url</code>描述的<code>API</code>就是有<code>OCP</code>提供的，那个数据库就是<code>OCP</code>的元数据库。这个设计比较特别，详细原因详细的可以查看《自动化运维产品的命门——元数据库》。</p>
+<h3 id="SQL审计参数"><a href="#SQL审计参数" class="headerlink" title="SQL审计参数"></a>SQL审计参数</h3><p>OceanBase在SQL性能诊断方面有个很有用的功能叫SQL审计视图(<code>gv$sql_audit</code>)，可以方便开发运维排查在OceanBase运行过的任意一条SQL，不管这些SQL是成功还是失败，都有详细的运行信息记录。如执行时间、执行节点、执行计划id、会话id、执行时间、等待时间、总时间、排队时间、相关block读取信息、执行报错信息等等。有关详细使用方法请参见《阿里数据库性能诊断的利器——SQL全量日志》。</p>
+<p>这个视图的内容都保存在内存里，内存大小由参数<code>sql_audit_memory_limit</code>控制，默认值<code>3G</code>。还有另外一个参数<code>sql_audit_queue_size</code>控制记录数，默认值是<code>1000万</code>。一个繁忙的数据库，SQL记录数或者这个大小很快就会超过这两个阈值。当然如果不想用这个SQL审计功能，还可以关闭它。由参数<code>enable_sql_audit</code>控制，默认值是<code>False</code>。</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">show</span> parameters <span class="keyword">like</span> <span class="string">&#x27;%audit%&#x27;</span>;</span><br></pre></td></tr></table></figure>
+<p><img src="/images/15620559065270.jpg" alt="-w1371"></p>
+<h3 id="资源分配参数"><a href="#资源分配参数" class="headerlink" title="资源分配参数"></a>资源分配参数</h3><p>在前文《揭秘OceanBase的弹性伸缩和负载均衡原理》我介绍了OceanBase对资源的管理方法。其中查看集群资源的SQL如下：</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">select</span> zone,concat(svr_ip,<span class="string">&#x27;:&#x27;</span>,svr_port) observer, cpu_total,cpu_assigned,cpu_assigned_percent, round(mem_total<span class="operator">/</span><span class="number">1024</span><span class="operator">/</span><span class="number">1024</span><span class="operator">/</span><span class="number">1024</span>) mem_total_gb, round(mem_assigned<span class="operator">/</span><span class="number">1024</span><span class="operator">/</span><span class="number">1024</span><span class="operator">/</span><span class="number">1024</span>) mem_assigned_gb, mem_assigned_percent, unit_Num,round(`load`,<span class="number">2</span>) `load`, round(cpu_weight,<span class="number">2</span>) cpu_weight, round(memory_weight,<span class="number">2</span>) mem_weight, leader_count</span><br><span class="line"><span class="keyword">from</span> __all_virtual_server_stat</span><br><span class="line"><span class="keyword">order</span> <span class="keyword">by</span> zone,svr_ip</span><br><span class="line">;</span><br></pre></td></tr></table></figure>
+<p><img src="/images/15620558449298.jpg" alt="-w1349"></p>
+<p>这里面CPU是30个，内存<code>mem_total</code>大小是<code>193G</code>是OBServer启动时从主机获取的。OceanBase可以将主机获取的资源乘以一个系数就是总的可分配资源。这个系数是参数<code>resource_hard_limit</code>决定，默认值是100，即百分百。如果把这个参数调整到120，我们可以看到总资源就扩大了。这个只适用于学习环境CPU节点数比较少的时候扩大CPU节点个数，对于内存，资源池分配的时候是按<code>min_memory</code>指定值起步增加，所以可以将<code>min_memory</code>设低一点。在生产环境不要修改这个，否则可能在业务压力上来时遭遇内存不足。</p>
+<p>OceanBase在分配资源单元的时候，如果每个<code>Zone</code>有多个节点的时候，它会考虑各个节点的资源利用情况和负载情况，以决策从那个节点里分配资源单元。有个参数<code>resource_soft_limit</code>会影响OB在判断一个节点资源利用率是否合适继续分配资源单元。默认值是50(即百分50).这个值最大不能超过参数<code>resource_hard_limit</code>。这个意思是如果有节点资源利用率低于这个比例，那么就是候选节点之一。只要有候选节点，OB就不会首先挑选其他的资源利用率明显高于这个值的节点。如果集群中小租户比较多，这个参数值可以设置的再低一点。</p>
+<p><img src="/images/15620705846159.jpg" alt="-w1401"></p>
+<p>目前OceanBase集群初始化成功时，会保留一定比例内存用于内部跟业务租户有关的运算。比如说更新统计信息等。这个内存比例由参数<code>system_memory_percentage</code>控制，同时系统还保留几个CPU用于内部逻辑，这个由参数<code>system_cpu_quota</code>控制。这两个参数值都可能会随着OB版本变化而变化。</p>
+<p>OB可以有很多会话，但是内部执行请求的工作线程(<code>worker</code>)数量是固定的，对于每个租户而言，<code>worker</code>的数量是租户的<code>CPU</code>配额乘以参数<code>workers_per_cpu_quota</code>的值。参数默认值是<code>10</code>。我们并不建议去修改这个参数。在这么多的<code>worker</code>里，为了避免小而快的查询被一些慢查询SQL占住<code>worker</code>而出现等待过多的现象，OB对SQL的请求队列分为两类，其中一类是用于慢查询的。慢查的标准是执行时间超过参数<code>large_query_threshold</code>的值时就被放入到慢查队列里。同时用于执行慢查队列请求的<code>worker</code>数量比例由参数<code>large_query_worker_percentage</code>控制。这两个参数都是可以根据实际场景SQL特点调整的。比如说如果偏<code>OLAP</code>类查询比较多，则调大这个比例；如果是纯粹<code>OLTP</code>类SQL，则调小这个比例。</p>
+<p><img src="/images/15620724730916.jpg" alt="-w1402"></p>
+<h3 id="资源负载均衡相关参数"><a href="#资源负载均衡相关参数" class="headerlink" title="资源负载均衡相关参数"></a>资源负载均衡相关参数</h3><p>OB的负载均衡策略比较复杂，并且可能随着版本演进。这里还介绍不了。不过有些固定的逻辑倒是可以提一下。比如说每个租户资源池在每个<code>Zone</code>都有<code>Unit</code>，如果某个租户在该<code>Zone</code>的<code>Unit</code>的<code>CPU</code>非常忙，而它其他两个<code>Zone</code>的<code>Unit</code>可能非常空闲(可能大部分是<code>follower</code>副本又不提供服务)。那么OB可以将其他两个<code>Zone</code>的<code>Unit</code>的<code>CPU</code>配额匀一部分给到负载最高的<code>Zone</code>的<code>Unit</code>上。注意是同一个租户不同<code>Zone</code>之间在调剂<code>CPU</code>配额。当然调整的粒度也是受参数<code>tenant_cpu_variation_per_server</code>控制的。</p>
+<p><img src="/images/15620721146366.jpg" alt="-w1401"></p>
+<p>在决定是否要做负载均衡的时候，节点里各个<code>Unit</code>的总空间会是一个很重要的因素。理想状况下各个节点内空间利用率应该是均衡的，但实际上不可能完全一样。那么对于空间是否均衡就有个衡量标准。比如说某个节点的空间高出平均值多少水平才算不均衡，这个标准就是参数<code>balancer_tolerance_percentage</code>控制，默认值是10(即百分之10)。注意，这只是其中一个因素。触发均衡策略后能否做Unit迁移也看<code>Unit</code>实际大小和其他节点的剩余空间。</p>
+<p><img src="/images/15621162547184.jpg" alt="-w1404"></p>
+<p>当OB判断要做负载均衡时，就会发起以<code>Partition</code>为单位的副本迁移。OB做副本迁移的时候是现在目标位置生成一个新的<code>Follower</code>副本，该<code>Follower</code>副本会先从已有的一个<code>Follower</code>副本拉取数据和后续的<code>Redo</code>。这其中就不可避免的有跨节点请求。OB有一序列参数可以控制这个分区跨节点传输的效率。</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">show</span> parameters <span class="keyword">where</span> name <span class="keyword">in</span> (<span class="string">&#x27;data_copy_concurrency&#x27;</span>, <span class="string">&#x27;server_data_copy_out_concurrency&#x27;</span>,<span class="string">&#x27;server_data_copy_in_concurrency&#x27;</span>);</span><br></pre></td></tr></table></figure>
+
+<p><img src="/images/15620730136730.jpg" alt="-w1401"></p>
+<p>OB的负载均衡是目前所有分布式数据库里做得最好的，既让应用免于迁移数据，又提供策略供应用干预。不过俗话说没有最好，只有更好。OB的负载均衡策略还有很大提升空间。这点跟当今流行的自动驾驶技术一样。你可以在特定的路况下将控制权交给它，然后在特殊的情形下又回收控制权。在OB里可以通过参数<code>enable_rebalance</code>开启和关闭负载均衡机制。</p>
+<h3 id="内存的冻结、转储和合并参数"><a href="#内存的冻结、转储和合并参数" class="headerlink" title="内存的冻结、转储和合并参数"></a>内存的冻结、转储和合并参数</h3><p>OB的内存其中一大用途就是报错增量数据，简称为增量内存。这部份增量内存就如同一个水池。业务读写就如同进水管，内存已使用比例会逐步上升。按照这个趋势最终会全部用尽。所以OB还有冻结机制。当已使用内存占增量内存的比例超过参数<code>freeze_trigger_percentage</code>时，就会冻结当前内存中的<code>memtable</code>，然后迅速生成新的<code>memtable</code>用于继续读写。随后对于已经冻结的<code>memtable</code>就开始以<code>SSTable</code>格式转储到磁盘上，释放增量内存。这如同一个放水管。由于OB的写性能非常好，当对OB进行业务压测的时候，如果写入对内存的消耗速度高于转储对内存的释放速度时，增量内存还是会很快耗尽(时间取决于增量内存的大小，默认是租户内存的<code>50%</code>)。加上可转储的次数是有限的(由参数<code>minor_freeze_times</code>控制)，所以理论上总是有可能耗尽增量内存的。所以租户的内存大小要考虑业务写入的压力。<br><img src="/images/15620738184039.jpg" alt="-w396"></p>
+<p>不过，即使初期租户内存评估不到位，后期也可以扩容的。OB的扩容和缩容都是在线进行的，非常方便。除了转储可以释放内存外，OB每天还有固定的一次大合并(<code>merge</code>)，这个时候会把增量内存中<code>memtable</code>和基线内存中的<code>sstable</code>直接合并然后以<code>sstable</code>格式写到数据文件里。这个大合并的时间是由参数<code>major_freeze_duty_time</code>设定的，通常设定在业务低峰期。如凌晨。</p>
+<p>下面是这些参数的值和介绍。</p>
+<p><img src="/images/15620738970922.jpg" alt="-w1404"></p>
+<p>集群的参数还有很多，还包括一些以<code>__</code>开头的隐含参数。这里就先介绍到这里。以后在介绍具体功能的时候再继续介绍参数。接下来看看租户变量。</p>
+<h2 id="租户变量"><a href="#租户变量" class="headerlink" title="租户变量"></a>租户变量</h2><p>租户变量(<code>variable</code>)的设计主要是参考<code>MySQL</code>的。所以目前介绍的主要是<code>MySQL</code>租户的。其中有些变量特性在<code>ORACLE</code>租户里也有。<br>租户可能需要调整的变量比较少。</p>
+<h3 id="变量查看方法"><a href="#变量查看方法" class="headerlink" title="变量查看方法"></a>变量查看方法</h3><p>这个跟MySQL的变量查看和修改方法 是一致的。</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line"><span class="keyword">show</span> <span class="keyword">global</span> variables <span class="keyword">like</span> <span class="string">&#x27;%timeout%&#x27;</span>;</span><br><span class="line"></span><br><span class="line"><span class="keyword">show</span> <span class="keyword">global</span> variables <span class="keyword">where</span> variable_name <span class="keyword">in</span> (<span class="string">&#x27;ob_query_timeout&#x27;</span>,<span class="string">&#x27;ob_trx_timeout&#x27;</span>,<span class="string">&#x27;ob_trx_idle_timeout&#x27;</span>);</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h3 id="租户超时变量设置"><a href="#租户超时变量设置" class="headerlink" title="租户超时变量设置"></a>租户超时变量设置</h3><p>上篇文章《从ORACLE/MySQL到OceanBase：数据库超时机制》介绍了租户跟超时有关的一些参数。其中变量 <code>ob_trx_idle_timeout</code>是 2.x某个版本新增的。</p>
+<p><img src="/images/15620769654042.jpg" alt="-w867"></p>
+<h3 id="租户白名单变量设置"><a href="#租户白名单变量设置" class="headerlink" title="租户白名单变量设置"></a>租户白名单变量设置</h3><p>租户变量<code>ob_tcp_invited_nodes</code>可以针对访问来源设置白名单。白名单格式可以是<code>&#39;%&#39;</code>，表示允许所有的来源。也可以是一个或多个具体的<code>IP</code>或者子网。如：<code>10.168.0.0/16</code>等。</p>
+<figure class="highlight sql"><table><tr><td class="code"><pre><span class="line">mysql<span class="operator">&gt;</span> <span class="keyword">set</span> <span class="keyword">global</span> ob_tcp_invited_nodes<span class="operator">=</span><span class="string">&#x27;127.1,10.168.0.0/16&#x27;</span>;</span><br></pre></td></tr></table></figure>
+
+<h3 id="事务相关变量设置"><a href="#事务相关变量设置" class="headerlink" title="事务相关变量设置"></a>事务相关变量设置</h3><p>租户变量<code>autocommit</code>可以控制会话默认是否开启事务，默认值为<code>on</code>。通常应用端也会在<code>jdbc</code>里明确设置。不要依赖数据库默认值。以防数据库默认值被修改。</p>
+<h3 id="其他"><a href="#其他" class="headerlink" title="其他"></a>其他</h3><p>OB新增了很多变量用于影响执行计划。目前对这些变量细节我还不了解，暂时留到以后介绍。</p>
+<p><img src="/images/15620776079705.jpg" alt="-w598"></p>
+<h2 id="后记"><a href="#后记" class="headerlink" title="后记"></a>后记</h2><p>此外由于OceanBase版本的演进，还会有更多参数开放，也可能有些参数逐步弃用。不管是架构原理，还是参数，还是运维实践，OceanBase都是一个有深度的数据库。</p>
+]]></content>
+      <tags>
+        <tag>运维</tag>
+      </tags>
+  </entry>
 </search>
